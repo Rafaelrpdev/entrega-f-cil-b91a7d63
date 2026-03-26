@@ -1,72 +1,123 @@
-import { useState } from 'react';
-import { ShoppingCart } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ShoppingCart, User, LogOut } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
-import { products } from '@/data/products';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import ProductCard from '@/components/ProductCard';
 import ProductDetail from '@/components/ProductDetail';
 import CartSheet from '@/components/CartSheet';
 import PromoBanner from '@/components/PromoBanner';
+import AuthSheet from '@/components/AuthSheet';
+import CustomerRegistration from '@/components/CustomerRegistration';
 import { useCart } from '@/contexts/CartContext';
+import { useAuth } from '@/contexts/AuthContext';
 import type { Product } from '@/types/product';
+
+import gasImg from '@/assets/gas.jpg';
+import aguaImg from '@/assets/agua.jpg';
+import carvaoImg from '@/assets/carvao.jpg';
+
+const categoryImages: Record<string, string> = { gas: gasImg, agua: aguaImg, carvao: carvaoImg };
 
 const Index = () => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
+  const [authOpen, setAuthOpen] = useState(false);
+  const [registrationOpen, setRegistrationOpen] = useState(false);
   const { totalItems } = useCart();
+  const { user, signOut } = useAuth();
+
+  const { data: dbProducts } = useQuery({
+    queryKey: ['products'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('products').select('*');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: customer } = useQuery({
+    queryKey: ['customer', user?.id],
+    queryFn: async () => {
+      const { data } = await supabase.from('customers').select('*').eq('user_id', user!.id).maybeSingle();
+      return data;
+    },
+    enabled: !!user,
+  });
+
+  // Prompt registration if logged in but no customer profile
+  useEffect(() => {
+    if (user && customer === null) {
+      setRegistrationOpen(true);
+    }
+  }, [user, customer]);
+
+  const products: Product[] = (dbProducts || []).map(p => ({
+    id: p.id,
+    name: p.name,
+    description: p.description || '',
+    price: Number(p.sale_price),
+    image: p.image_url || categoryImages[p.category] || gasImg,
+    category: p.category as 'gas' | 'agua' | 'carvao',
+  }));
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="sticky top-0 z-40 bg-card/80 backdrop-blur-md border-b border-border">
         <div className="max-w-2xl mx-auto flex items-center justify-between px-4 py-3">
           <div>
             <h1 className="text-lg font-bold text-foreground">Gás & Água Express</h1>
             <p className="text-xs text-muted-foreground">Delivery rápido e seguro</p>
           </div>
-          <button
-            onClick={() => setCartOpen(true)}
-            className="relative p-2.5 rounded-xl bg-primary/10 text-primary"
-          >
-            <ShoppingCart className="w-5 h-5" />
-            {totalItems > 0 && (
-              <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
-                {totalItems}
-              </span>
+          <div className="flex items-center gap-2">
+            {user ? (
+              <button onClick={() => signOut()} className="p-2.5 rounded-xl bg-muted text-muted-foreground" title="Sair">
+                <LogOut className="w-5 h-5" />
+              </button>
+            ) : (
+              <button onClick={() => setAuthOpen(true)} className="p-2.5 rounded-xl bg-muted text-muted-foreground" title="Entrar">
+                <User className="w-5 h-5" />
+              </button>
             )}
-          </button>
+            <button onClick={() => setCartOpen(true)} className="relative p-2.5 rounded-xl bg-primary/10 text-primary">
+              <ShoppingCart className="w-5 h-5" />
+              {totalItems > 0 && (
+                <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                  {totalItems}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
       </header>
 
-      {/* Content */}
       <main className="max-w-2xl mx-auto px-4 py-4 space-y-6 pb-8">
         <PromoBanner />
+
+        {user && customer && (
+          <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 flex items-center gap-3">
+            <User className="w-5 h-5 text-primary" />
+            <span className="text-sm text-foreground">Olá, <strong>{customer.name}</strong>!</span>
+          </div>
+        )}
 
         <section>
           <h2 className="text-base font-semibold text-foreground mb-3">Nossos Produtos</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {products.map(product => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                onSelect={setSelectedProduct}
-              />
+              <ProductCard key={product.id} product={product} onSelect={setSelectedProduct} />
             ))}
           </div>
         </section>
       </main>
 
-      {/* Product Detail Overlay */}
       <AnimatePresence>
-        {selectedProduct && (
-          <ProductDetail
-            product={selectedProduct}
-            onBack={() => setSelectedProduct(null)}
-          />
-        )}
+        {selectedProduct && <ProductDetail product={selectedProduct} onBack={() => setSelectedProduct(null)} />}
       </AnimatePresence>
 
-      {/* Cart */}
       <CartSheet open={cartOpen} onOpenChange={setCartOpen} />
+      <AuthSheet open={authOpen} onOpenChange={setAuthOpen} />
+      <CustomerRegistration open={registrationOpen} onOpenChange={setRegistrationOpen} onComplete={() => {}} />
     </div>
   );
 };
