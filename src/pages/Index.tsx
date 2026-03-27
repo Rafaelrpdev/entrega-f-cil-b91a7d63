@@ -119,6 +119,43 @@ const Index = () => {
           </div>
         )}
 
+        <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <button
+            onClick={() => setCartOpen(true)}
+            className="flex flex-col items-center gap-2 p-4 rounded-xl bg-primary/10 hover:bg-primary/20 transition-colors"
+          >
+            <ShoppingCart className="w-6 h-6 text-primary" />
+            <span className="text-xs font-medium text-foreground">Comprar</span>
+          </button>
+          <button
+            onClick={() => {
+              if (!user) { setAuthOpen(true); return; }
+              navigate('/meus-pedidos');
+            }}
+            className="flex flex-col items-center gap-2 p-4 rounded-xl bg-accent/50 hover:bg-accent transition-colors"
+          >
+            <Package className="w-6 h-6 text-accent-foreground" />
+            <span className="text-xs font-medium text-foreground">Meus Pedidos</span>
+          </button>
+          <button
+            onClick={() => {
+              if (!user) { setAuthOpen(true); return; }
+              setRegistrationOpen(true);
+            }}
+            className="flex flex-col items-center gap-2 p-4 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors"
+          >
+            <User className="w-6 h-6 text-secondary-foreground" />
+            <span className="text-xs font-medium text-foreground">Meu Perfil</span>
+          </button>
+          <button
+            onClick={() => navigate('/suporte')}
+            className="flex flex-col items-center gap-2 p-4 rounded-xl bg-muted hover:bg-muted/80 transition-colors"
+          >
+            <HelpCircle className="w-6 h-6 text-muted-foreground" />
+            <span className="text-xs font-medium text-foreground">Suporte</span>
+          </button>
+        </section>
+
         <section>
           <h2 className="text-base font-semibold text-foreground mb-3">Nossos Produtos</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
