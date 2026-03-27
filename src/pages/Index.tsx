@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { ShoppingCart, User, LogOut } from 'lucide-react';
+import { ShoppingCart, User, LogOut, Shield } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
