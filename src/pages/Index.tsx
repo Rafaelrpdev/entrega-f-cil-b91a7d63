@@ -82,9 +82,16 @@ const Index = () => {
           </div>
           <div className="flex items-center gap-2">
             {user ? (
-              <button onClick={() => signOut()} className="p-2.5 rounded-xl bg-muted text-muted-foreground" title="Sair">
-                <LogOut className="w-5 h-5" />
-              </button>
+              <>
+                {isAdmin && (
+                  <button onClick={() => navigate('/admin')} className="p-2.5 rounded-xl bg-primary/10 text-primary" title="Admin">
+                    <Shield className="w-5 h-5" />
+                  </button>
+                )}
+                <button onClick={() => signOut()} className="p-2.5 rounded-xl bg-muted text-muted-foreground" title="Sair">
+                  <LogOut className="w-5 h-5" />
+                </button>
+              </>
             ) : (
               <button onClick={() => setAuthOpen(true)} className="p-2.5 rounded-xl bg-muted text-muted-foreground" title="Entrar">
                 <User className="w-5 h-5" />
