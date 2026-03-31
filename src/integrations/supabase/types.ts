@@ -280,6 +280,39 @@ export type Database = {
         }
         Relationships: []
       }
+      store_settings: {
+        Row: {
+          business_hours: Json
+          created_at: string
+          id: string
+          name: string
+          phone: string
+          pix_key: string
+          updated_at: string
+          whatsapp: string
+        }
+        Insert: {
+          business_hours?: Json
+          created_at?: string
+          id?: string
+          name?: string
+          phone?: string
+          pix_key?: string
+          updated_at?: string
+          whatsapp?: string
+        }
+        Update: {
+          business_hours?: Json
+          created_at?: string
+          id?: string
+          name?: string
+          phone?: string
+          pix_key?: string
+          updated_at?: string
+          whatsapp?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
