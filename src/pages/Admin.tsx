@@ -4,11 +4,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Package, ShoppingBag, BarChart3, Image } from 'lucide-react';
+import { ArrowLeft, Package, ShoppingBag, BarChart3, Image, Settings } from 'lucide-react';
 import AdminProducts from '@/components/admin/AdminProducts';
 import AdminOrders from '@/components/admin/AdminOrders';
 import AdminFinance from '@/components/admin/AdminFinance';
 import AdminBanners from '@/components/admin/AdminBanners';
+import AdminStoreSettings from '@/components/admin/AdminStoreSettings';
 
 export default function Admin() {
   const { user, loading } = useAuth();
