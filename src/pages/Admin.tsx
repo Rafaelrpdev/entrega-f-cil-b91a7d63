@@ -46,16 +46,18 @@ export default function Admin() {
 
       <main className="max-w-5xl mx-auto px-4 py-4">
         <Tabs defaultValue="orders">
-          <TabsList className="w-full grid grid-cols-4 mb-4">
+          <TabsList className="w-full grid grid-cols-5 mb-4">
             <TabsTrigger value="orders" className="gap-1.5"><ShoppingBag className="w-4 h-4" /> Pedidos</TabsTrigger>
             <TabsTrigger value="products" className="gap-1.5"><Package className="w-4 h-4" /> Produtos</TabsTrigger>
             <TabsTrigger value="banners" className="gap-1.5"><Image className="w-4 h-4" /> Banners</TabsTrigger>
             <TabsTrigger value="finance" className="gap-1.5"><BarChart3 className="w-4 h-4" /> Financeiro</TabsTrigger>
+            <TabsTrigger value="settings" className="gap-1.5"><Settings className="w-4 h-4" /> Empresa</TabsTrigger>
           </TabsList>
           <TabsContent value="orders"><AdminOrders /></TabsContent>
           <TabsContent value="products"><AdminProducts /></TabsContent>
           <TabsContent value="banners"><AdminBanners /></TabsContent>
           <TabsContent value="finance"><AdminFinance /></TabsContent>
+          <TabsContent value="settings"><AdminStoreSettings /></TabsContent>
         </Tabs>
       </main>
     </div>
