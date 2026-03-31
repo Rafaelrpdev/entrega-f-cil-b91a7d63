@@ -65,7 +65,7 @@ export default function AdminStoreSettings() {
       phone: phone.trim(),
       whatsapp: whatsapp.trim(),
       pix_key: pixKey.trim(),
-      business_hours: businessHours as unknown as Record<string, unknown>,
+      business_hours: businessHours as unknown as Json,
     };
 
     const { error } = settingsId
