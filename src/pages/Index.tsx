@@ -7,7 +7,6 @@ import { supabase } from '@/integrations/supabase/client';
 import ProductCard from '@/components/ProductCard';
 import ProductDetail from '@/components/ProductDetail';
 import CartSheet from '@/components/CartSheet';
-import CheckoutSheet from '@/components/CheckoutSheet';
 import PromoBanner from '@/components/PromoBanner';
 import AuthSheet from '@/components/AuthSheet';
 import CustomerRegistration from '@/components/CustomerRegistration';
