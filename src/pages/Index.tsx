@@ -25,7 +25,6 @@ const Index = () => {
   const [cartOpen, setCartOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
   const [registrationOpen, setRegistrationOpen] = useState(false);
-  const [checkoutOpen, setCheckoutOpen] = useState(false);
   const { totalItems, totalPrice } = useCart();
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
