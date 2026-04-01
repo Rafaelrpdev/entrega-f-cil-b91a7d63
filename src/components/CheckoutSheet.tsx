@@ -203,6 +203,10 @@ export default function CheckoutSheet({ open, onOpenChange }: Props) {
               <Label htmlFor="address">Endereço de Entrega</Label>
               <Input id="address" placeholder="Rua, número, bairro" value={address} onChange={e => setAddress(e.target.value)} />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="notes">Observações (opcional)</Label>
+              <Input id="notes" placeholder="Ex: troco para R$ 50" value={notes} onChange={e => setNotes(e.target.value)} />
+            </div>
           </div>
 
           {/* Coupon Section */}
