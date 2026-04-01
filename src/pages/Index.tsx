@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ShoppingCart, User, LogOut, Shield, Package, HelpCircle } from 'lucide-react';
+import { ShoppingCart, User, LogOut, Shield, Package, HelpCircle, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
