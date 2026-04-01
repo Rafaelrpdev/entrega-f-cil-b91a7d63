@@ -173,8 +173,22 @@ const Index = () => {
       </AnimatePresence>
 
       <CartSheet open={cartOpen} onOpenChange={setCartOpen} />
+      <CheckoutSheet open={checkoutOpen} onOpenChange={setCheckoutOpen} />
       <AuthSheet open={authOpen} onOpenChange={setAuthOpen} />
       <CustomerRegistration open={registrationOpen} onOpenChange={setRegistrationOpen} onComplete={() => {}} />
+
+      {totalItems > 0 && !cartOpen && !checkoutOpen && (
+        <button
+          onClick={() => setCheckoutOpen(true)}
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-primary text-primary-foreground px-6 py-3.5 rounded-2xl shadow-lg shadow-primary/30 hover:brightness-110 active:scale-95 transition-all max-w-[90vw]"
+        >
+          <ShoppingCart className="w-5 h-5 shrink-0" />
+          <span className="font-semibold text-sm">{totalItems} {totalItems === 1 ? 'item' : 'itens'}</span>
+          <span className="mx-1 opacity-50">|</span>
+          <span className="font-bold text-sm">R$ {totalPrice.toFixed(2).replace('.', ',')}</span>
+          <ArrowRight className="w-4 h-4 ml-1 shrink-0" />
+        </button>
+      )}
     </div>
   );
 };
