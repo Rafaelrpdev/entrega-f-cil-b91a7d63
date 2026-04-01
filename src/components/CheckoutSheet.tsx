@@ -8,6 +8,7 @@ import { CreditCard, Banknote, QrCode, CheckCircle2, Tag, X, Loader2 } from 'luc
 import type { PaymentMethod, PaymentTiming } from '@/types/product';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
 
 interface Props {
   open: boolean;
@@ -37,12 +38,13 @@ const paymentLabels: Record<PaymentMethod, string> = {
 };
 
 export default function CheckoutSheet({ open, onOpenChange }: Props) {
-  const { totalPrice, clearCart } = useCart();
+  const { items, totalPrice, clearCart } = useCart();
   const [timing, setTiming] = useState<PaymentTiming | null>(null);
   const [method, setMethod] = useState<PaymentMethod | null>(null);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
+  const [notes, setNotes] = useState('');
   const [submitted, setSubmitted] = useState(false);
 
   // Coupon state
@@ -54,6 +56,14 @@ export default function CheckoutSheet({ open, onOpenChange }: Props) {
   const finalTotal = Math.max(0, totalPrice - discount);
 
   const availableMethods: PaymentMethod[] = timing === 'agora' ? ['pix'] : ['pix', 'credito', 'debito', 'dinheiro'];
+
+  const { data: storeSettings } = useQuery({
+    queryKey: ['store-settings'],
+    queryFn: async () => {
+      const { data } = await supabase.from('store_settings').select('*').limit(1).maybeSingle();
+      return data;
+    },
+  });
 
   const applyCoupon = async () => {
     const code = couponCode.trim().toUpperCase();
@@ -106,11 +116,45 @@ export default function CheckoutSheet({ open, onOpenChange }: Props) {
     setCouponCode('');
   };
 
+  const buildWhatsAppMessage = () => {
+    const itemsText = items
+      .map(i => `• ${i.quantity}x ${i.product.name} — R$ ${(i.product.price * i.quantity).toFixed(2).replace('.', ',')}`)
+      .join('\n');
+
+    let msg = `🛒 *NOVO PEDIDO*\n\n`;
+    msg += `👤 *Cliente:* ${name}\n`;
+    msg += `📱 *Telefone:* ${phone}\n`;
+    msg += `📍 *Endereço:* ${address}\n\n`;
+    msg += `📦 *Itens:*\n${itemsText}\n\n`;
+    msg += `💰 *Subtotal:* R$ ${totalPrice.toFixed(2).replace('.', ',')}\n`;
+    if (appliedCoupon) {
+      msg += `🏷️ *Cupom (${appliedCoupon.code}):* -R$ ${discount.toFixed(2).replace('.', ',')}\n`;
+    }
+    msg += `💵 *Total:* R$ ${finalTotal.toFixed(2).replace('.', ',')}\n\n`;
+    msg += `💳 *Pagamento:* ${paymentLabels[method!]} (${timing === 'agora' ? 'Pagar agora' : 'Pagar na entrega'})`;
+    if (notes.trim()) {
+      msg += `\n\n📝 *Observações:* ${notes.trim()}`;
+    }
+
+    return msg;
+  };
+
   const handleSubmit = () => {
     if (!name || !phone || !address || !timing || !method) {
       toast.error('Preencha todos os campos');
       return;
     }
+
+    const message = buildWhatsAppMessage();
+    const whatsappNumber = (storeSettings?.whatsapp || '').replace(/\D/g, '');
+
+    if (whatsappNumber) {
+      const url = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
+      window.open(url, '_blank');
+    } else {
+      toast.error('WhatsApp da empresa não configurado');
+    }
+
     setSubmitted(true);
     clearCart();
   };
