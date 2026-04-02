@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { Save, Store, Clock } from 'lucide-react';
+import { Save, Store, Clock, Zap } from 'lucide-react';
 
 const DAYS = [
   { key: 'monday', label: 'Segunda-feira' },
@@ -31,21 +31,34 @@ export default function AdminStoreSettings() {
   const [whatsapp, setWhatsapp] = useState('');
   const [pixKey, setPixKey] = useState('');
   const [businessHours, setBusinessHours] = useState<BusinessHours>({});
+  
+  // Automation settings
+  const [automationActive, setAutomationActive] = useState(false);
+  const [webhookUrl, setWebhookUrl] = useState('');
+  const [apiToken, setApiToken] = useState('');
 
   useEffect(() => {
     supabase
       .from('store_settings')
       .select('*')
       .limit(1)
-      .single()
-      .then(({ data, error }) => {
+      .maybeSingle()
+      .then(({ data }) => {
         if (data) {
           setSettingsId(data.id);
-          setName(data.name);
-          setPhone(data.phone);
-          setWhatsapp(data.whatsapp);
-          setPixKey(data.pix_key);
-          setBusinessHours(data.business_hours as unknown as BusinessHours);
+          setName(data.name || '');
+          setPhone(data.phone || '');
+          setWhatsapp(data.whatsapp || '');
+          setPixKey(data.pix_key || '');
+          setBusinessHours(data.business_hours as unknown as BusinessHours || {});
+          
+          // Load automation fields (using dynamic keys to avoid TS errors for potentially missing columns)
+          // @ts-ignore
+          setAutomationActive(!!data.whatsapp_automation_active);
+          // @ts-ignore
+          setWebhookUrl(data.whatsapp_webhook_url || '');
+          // @ts-ignore
+          setApiToken(data.whatsapp_api_token || '');
         }
         setLoading(false);
       });
@@ -54,7 +67,7 @@ export default function AdminStoreSettings() {
   const updateDay = (day: string, field: keyof DaySchedule, value: string | boolean) => {
     setBusinessHours(prev => ({
       ...prev,
-      [day]: { ...prev[day], [field]: value },
+      [day]: { ...(prev[day] || { open: '08:00', close: '22:00', enabled: false }), [field]: value },
     }));
   };
 
@@ -66,6 +79,9 @@ export default function AdminStoreSettings() {
       whatsapp: whatsapp.trim(),
       pix_key: pixKey.trim(),
       business_hours: businessHours as unknown as Json,
+      whatsapp_automation_active: automationActive,
+      whatsapp_webhook_url: webhookUrl.trim(),
+      whatsapp_api_token: apiToken.trim(),
     };
 
     const { error } = settingsId
@@ -74,7 +90,7 @@ export default function AdminStoreSettings() {
 
     setSaving(false);
     if (error) {
-      toast.error('Erro ao salvar configurações');
+      toast.error('Erro ao salvar configurações: ' + error.message);
     } else {
       toast.success('Configurações salvas com sucesso!');
     }
@@ -83,7 +99,7 @@ export default function AdminStoreSettings() {
   if (loading) return <div className="text-center py-8 text-muted-foreground">Carregando...</div>;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 max-w-4xl mx-auto pb-10">
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
@@ -101,13 +117,41 @@ export default function AdminStoreSettings() {
               <Input id="store-phone" value={phone} onChange={e => setPhone(e.target.value)} placeholder="(00) 0000-0000" />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="store-whatsapp">WhatsApp</Label>
+              <Label htmlFor="store-whatsapp">WhatsApp (Exibição)</Label>
               <Input id="store-whatsapp" value={whatsapp} onChange={e => setWhatsapp(e.target.value)} placeholder="(00) 00000-0000" />
             </div>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="store-pix">Chave PIX</Label>
             <Input id="store-pix" value={pixKey} onChange={e => setPixKey(e.target.value)} placeholder="CPF, CNPJ, e-mail, telefone ou chave aleatória" />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-primary/20 bg-primary/5">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2 text-primary">
+            <Zap className="w-4 h-4" /> Automação de WhatsApp (API)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between bg-background p-3 rounded-lg border border-primary/10">
+            <div className="space-y-0.5">
+              <Label className="text-sm font-bold">Enviar Mensagem Automática</Label>
+              <p className="text-[11px] text-muted-foreground">O pedido será enviado direto para a sua API sem confirmação do cliente.</p>
+            </div>
+            <Switch checked={automationActive} onCheckedChange={setAutomationActive} />
+          </div>
+
+          <div className="grid grid-cols-1 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="webhook-url">URL do Webhook / API</Label>
+              <Input id="webhook-url" value={webhookUrl} onChange={e => setWebhookUrl(e.target.value)} placeholder="https://api.z-api.io/instances/..." disabled={!automationActive} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="api-token">Token de API / Auth</Label>
+              <Input id="api-token" type="password" value={apiToken} onChange={e => setApiToken(e.target.value)} placeholder="Token secreto" disabled={!automationActive} />
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -120,7 +164,7 @@ export default function AdminStoreSettings() {
         </CardHeader>
         <CardContent className="space-y-3">
           {DAYS.map(({ key, label }) => {
-            const day = businessHours[key] || { open: '', close: '', enabled: false };
+            const day = businessHours[key] || { open: '08:00', close: '22:00', enabled: false };
             return (
               <div key={key} className="flex items-center gap-3">
                 <Switch checked={day.enabled} onCheckedChange={v => updateDay(key, 'enabled', v)} />
@@ -146,9 +190,9 @@ export default function AdminStoreSettings() {
         </CardContent>
       </Card>
 
-      <Button onClick={handleSave} disabled={saving} className="w-full gap-2">
+      <Button onClick={handleSave} disabled={saving} className="w-full h-12 gap-2 text-base shadow-lg shadow-primary/20">
         <Save className="w-4 h-4" />
-        {saving ? 'Salvando...' : 'Salvar Configurações'}
+        {saving ? 'Salvando...' : 'Salvar Todas as Configurações'}
       </Button>
     </div>
   );

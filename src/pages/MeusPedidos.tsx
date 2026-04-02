@@ -109,11 +109,13 @@ export default function MeusPedidos() {
                 </div>
 
                 <div className="border-t border-border pt-2 flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">
-                    {order.payment_method === 'pix' ? 'PIX' : order.payment_method === 'cash' ? 'Dinheiro' : 'Cartão'} • {order.payment_timing === 'on_order' ? 'Pago no pedido' : 'Na entrega'}
+                  <span className="text-xs text-muted-foreground uppercase font-bold tracking-tight">
+                    {order.payment_method === 'pix' ? 'PIX' : 
+                     order.payment_method === 'dinheiro' ? 'Dinheiro' : 
+                     'Cartão'} • {order.payment_timing === 'agora' ? 'Pago Agora' : 'Pagar na Entrega'}
                   </span>
-                  <span className="text-sm font-semibold text-foreground">
-                    R$ {Number(order.total).toFixed(2)}
+                  <span className="text-sm font-bold text-primary">
+                    R$ {Number(order.total).toFixed(2).replace('.', ',')}
                   </span>
                 </div>
               </div>

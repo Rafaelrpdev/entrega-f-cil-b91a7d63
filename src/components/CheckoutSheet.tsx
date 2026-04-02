@@ -3,12 +3,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useCart } from '@/contexts/CartContext';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { CreditCard, Banknote, QrCode, CheckCircle2, Tag, X, Loader2 } from 'lucide-react';
 import type { PaymentMethod, PaymentTiming } from '@/types/product';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Props {
   open: boolean;
@@ -38,6 +39,8 @@ const paymentLabels: Record<PaymentMethod, string> = {
 };
 
 export default function CheckoutSheet({ open, onOpenChange }: Props) {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const { items, totalPrice, clearCart } = useCart();
   const [timing, setTiming] = useState<PaymentTiming | null>(null);
   const [method, setMethod] = useState<PaymentMethod | null>(null);
@@ -46,6 +49,7 @@ export default function CheckoutSheet({ open, onOpenChange }: Props) {
   const [address, setAddress] = useState('');
   const [notes, setNotes] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [isSending, setIsSending] = useState(false);
 
   // Coupon state
   const [couponCode, setCouponCode] = useState('');
@@ -64,6 +68,24 @@ export default function CheckoutSheet({ open, onOpenChange }: Props) {
       return data;
     },
   });
+
+  const { data: customerProfile } = useQuery({
+    queryKey: ['customer-profile', user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const { data } = await supabase.from('customers').select('*').eq('user_id', user!.id).maybeSingle();
+      return data;
+    },
+  });
+
+  // Pre-fill from profile
+  useEffect(() => {
+    if (customerProfile) {
+      setName(customerProfile.name || '');
+      setPhone(customerProfile.phone || '');
+      setAddress(customerProfile.address || '');
+    }
+  }, [customerProfile]);
 
   const applyCoupon = async () => {
     const code = couponCode.trim().toUpperCase();
@@ -139,24 +161,110 @@ export default function CheckoutSheet({ open, onOpenChange }: Props) {
     return msg;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!name || !phone || !address || !timing || !method) {
       toast.error('Preencha todos os campos');
       return;
     }
 
-    const message = buildWhatsAppMessage();
-    const whatsappNumber = (storeSettings?.whatsapp || '').replace(/\D/g, '');
-
-    if (whatsappNumber) {
-      const url = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
-      window.open(url, '_blank');
-    } else {
-      toast.error('WhatsApp da empresa não configurado');
+    if (!customerProfile) {
+      toast.error('Perfil do cliente não encontrado');
+      return;
     }
 
-    setSubmitted(true);
-    clearCart();
+    setIsSending(true);
+
+    try {
+      // 1. Record the order in Supabase
+      const { data: newOrder, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          customer_id: customerProfile.id,
+          subtotal: totalPrice,
+          total: finalTotal,
+          discount: discount,
+          status: 'pending',
+          payment_method: method,
+          payment_timing: timing,
+          notes: notes.trim() || null,
+          coupon_id: appliedCoupon?.id || null
+        })
+        .select()
+        .single();
+
+      if (orderError) throw orderError;
+
+      // 2. Record order items
+      const orderItems = items.map(i => ({
+        order_id: newOrder.id,
+        product_id: i.product.id,
+        quantity: i.quantity,
+        unit_price: i.product.price,
+        total_price: i.product.price * i.quantity
+      }));
+
+      const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
+      if (itemsError) throw itemsError;
+
+      // 3. Update coupon usage
+      if (appliedCoupon) {
+        // @ts-ignore - RPC increment might be missing in types
+        await supabase.rpc('increment_coupon_usage', { coupon_id: appliedCoupon.id });
+      }
+
+      // 4. Send WhatsApp message
+      const message = buildWhatsAppMessage();
+      const whatsappNumber = (storeSettings?.whatsapp || '').replace(/\D/g, '');
+
+      // @ts-ignore - dynamic fields
+      const automationActive = !!storeSettings?.whatsapp_automation_active;
+      // @ts-ignore
+      const webhookUrl = storeSettings?.whatsapp_webhook_url;
+      // @ts-ignore
+      const apiToken = storeSettings?.whatsapp_api_token;
+      // @ts-ignore
+      const userConsented = !!customerProfile?.whatsapp_notif_consent;
+
+      if (automationActive && userConsented && webhookUrl) {
+        try {
+          const response = await fetch(webhookUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${apiToken}`,
+            },
+            body: JSON.stringify({
+              phone: whatsappNumber,
+              clientPhone: phone,
+              clientName: name,
+              message: message,
+              items: items,
+              total: finalTotal,
+              orderId: newOrder.id
+            }),
+          });
+          if (response.ok) toast.success('Pedido enviado automaticamente!');
+          else throw new Error('API Error');
+        } catch (err) {
+          if (whatsappNumber) {
+            const url = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
+            window.open(url, '_blank');
+          }
+        }
+      } else if (whatsappNumber) {
+        const url = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
+        window.open(url, '_blank');
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ['my-orders', customerProfile.id] });
+      setSubmitted(true);
+      clearCart();
+    } catch (error: any) {
+      console.error("Order submission error:", error);
+      toast.error('Ocorreu um erro ao registrar seu pedido: ' + error.message);
+    } finally {
+      setIsSending(false);
+    }
   };
 
   if (submitted) {
@@ -300,8 +408,13 @@ export default function CheckoutSheet({ open, onOpenChange }: Props) {
                     <span className="text-xl font-bold text-primary">R$ {finalTotal.toFixed(2).replace('.', ',')}</span>
                   </div>
                 </div>
-                <Button size="lg" className="w-full text-base" onClick={handleSubmit} disabled={!name || !phone || !address || !timing || !method}>
-                  Confirmar Pedido
+                <Button size="lg" className="w-full text-base" onClick={handleSubmit} disabled={!name || !phone || !address || !timing || !method || isSending}>
+                  {isSending ? (
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Enviando Pedido...
+                    </div>
+                  ) : 'Confirmar Pedido'}
                 </Button>
               </div>
             </div>
