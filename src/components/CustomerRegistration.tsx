@@ -165,14 +165,45 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
         </SheetHeader>
 
         <div className="overflow-y-auto p-4 space-y-4" style={{ maxHeight: 'calc(90vh - 140px)' }}>
-          <div className="space-y-2">
-            <Label>Nome Completo *</Label>
-            <Input placeholder="Seu nome" value={name} onChange={e => setName(e.target.value)} />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="md:col-span-2 space-y-4">
+              <div className="space-y-2">
+                <Label>Nome Completo *</Label>
+                <Input placeholder="Seu nome" value={name} onChange={e => setName(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Telefone *</Label>
+                <Input placeholder="(00) 00000-0000" value={phone} onChange={e => setPhone(e.target.value)} />
+              </div>
+            </div>
+            
+            <div className="space-y-2 group">
+              <Label className="flex justify-between">
+                Sua Localização 
+                {lat && <span className="text-[10px] text-muted-foreground">📍 GPS Ativo</span>}
+              </Label>
+              <div className="aspect-square md:aspect-auto md:h-full min-h-[120px] rounded-2xl bg-muted border border-border overflow-hidden relative shadow-inner">
+                {lat && lng ? (
+                  <iframe 
+                    width="100%" 
+                    height="100%" 
+                    frameBorder="0" 
+                    scrolling="no" 
+                    marginHeight={0} 
+                    marginWidth={0} 
+                    src={`https://www.openstreetmap.org/export/embed.html?bbox=${lng-0.005},${lat-0.005},${lng+0.005},${lat+0.005}&layer=mapnik&marker=${lat},${lng}`}
+                    className="opacity-80 group-hover:opacity-100 transition-opacity"
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center">
+                    <MapPin className="w-8 h-8 text-muted-foreground/30 mb-2" />
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Mapa não definido</p>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label>Telefone *</Label>
-            <Input placeholder="(00) 00000-0000" value={phone} onChange={e => setPhone(e.target.value)} />
-          </div>
+
           <div className="space-y-2">
             <Label>Endereço *</Label>
             <Input placeholder="Rua, número, bairro" value={address} onChange={e => setAddress(e.target.value)} />
