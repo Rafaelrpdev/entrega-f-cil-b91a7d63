@@ -1,19 +1,25 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { MapPin } from 'lucide-react';
+import { MapPin, Search } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
+import { GoogleMap, useJsApiLoader, MarkerF } from '@react-google-maps/api';
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onComplete: () => void;
 }
+
+const mapContainerStyle = {
+  width: '100%',
+  height: '100%'
+};
 
 export default function CustomerRegistration({ open, onOpenChange, onComplete }: Props) {
   const { user } = useAuth();
@@ -32,7 +38,16 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
   const [isGpsFixed, setIsGpsFixed] = useState(false);
   const queryClient = useQueryClient();
 
-  // Load existing data when opening
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
+  
+  const { isLoaded, loadError } = useJsApiLoader({
+    googleMapsApiKey: apiKey,
+    libraries: ['places'],
+    language: 'pt-BR',
+    region: 'BR'
+  });
+
+  // Load existing data
   useEffect(() => {
     if (open && user) {
       const loadProfile = async () => {
@@ -46,7 +61,6 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
           setName(data.name || '');
           setPhone(data.phone || '');
           
-          // Try to parse: "Rua, Num - Bairro - Cidade - Estado"
           const parts = data.address?.split(' - ') || [];
           if (parts.length >= 4) {
             setAddress(parts[0]);
@@ -66,7 +80,7 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
           if (data.latitude && data.longitude) {
             setLat(data.latitude);
             setLng(data.longitude);
-            setIsGpsFixed(true); // Lock it to the saved coordinates
+            setIsGpsFixed(true);
           }
           setIsEditMode(true);
         } else {
@@ -78,32 +92,32 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
     }
   }, [open, user]);
 
-  // Automatic geocoding (Debounced) - Only if not GPS fixed
+  // Google Maps Search (Geocoding)
+  const geocodeAddress = useCallback(() => {
+    if (!isLoaded || isGpsFixed || !address) return;
+
+    const geocoder = new google.maps.Geocoder();
+    const fullSearch = `${address}, ${neighborhood}, ${city}, ${state}, Brasil`;
+
+    geocoder.geocode({ address: fullSearch }, (results, status) => {
+      if (status === 'OK' && results && results[0]) {
+        const location = results[0].geometry.location;
+        setLat(location.lat());
+        setLng(location.lng());
+      }
+    });
+  }, [isLoaded, isGpsFixed, address, neighborhood, city, state]);
+
+  // Debounce search
   useEffect(() => {
     if (!address || !city || isGpsFixed) return;
-    
-    const handler = setTimeout(async () => {
-      // Improved query with state, city and country for better precision (avoid Curitiba vs Campo Largo mixup)
-      const fullAddress = `${address}, ${neighborhood}, ${city}, ${state}, Brasil`;
-      try {
-        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fullAddress)}`);
-        const results = await response.json();
-        if (results && results.length > 0) {
-          const { lat: newLat, lon: newLng } = results[0];
-          setLat(parseFloat(newLat));
-          setLng(parseFloat(newLng));
-        }
-      } catch (err) {
-        console.error("Geocoding error:", err);
-      }
-    }, 1500);
-
-    return () => clearTimeout(handler);
-  }, [address, neighborhood, city, state, isGpsFixed]);
+    const timer = setTimeout(geocodeAddress, 1500);
+    return () => clearTimeout(timer);
+  }, [address, neighborhood, city, state, geocodeAddress, isGpsFixed]);
 
   const getLocation = () => {
     if (!navigator.geolocation) {
-      toast.error('GPS não suportado neste navegador');
+      toast.error('GPS não suportado');
       return;
     }
     setGpsLoading(true);
@@ -112,22 +126,22 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
         const { latitude, longitude } = pos.coords;
         setLat(latitude);
         setLng(longitude);
-        setIsGpsFixed(true); // Mark it as GPS fixed
+        setIsGpsFixed(true);
         
-        try {
-          // Reverse geocoding to update fields (to ensure city/state match GPS context)
-          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
-          const data = await res.json();
-          if (data && data.address) {
-            if (data.address.city || data.address.town) setCity(data.address.city || data.address.town);
-            if (data.address.state) setState(data.address.state);
-          }
-          toast.success('Ponto marcado no mapa via GPS!');
-        } catch (err) {
-          toast.success('Ponto marcado!');
-        } finally {
-          setGpsLoading(false);
+        if (isLoaded) {
+          const geocoder = new google.maps.Geocoder();
+          geocoder.geocode({ location: { lat: latitude, lng: longitude } }, (results, status) => {
+            if (status === 'OK' && results && results[0]) {
+              const addr = results[0].address_components;
+              const cityName = addr.find(c => c.types.includes('locality'))?.long_name;
+              const stateName = addr.find(c => c.types.includes('administrative_area_level_1'))?.short_name;
+              if (cityName) setCity(cityName);
+              if (stateName) setState(stateName);
+            }
+          });
         }
+        setGpsLoading(false);
+        toast.success('Localização capturada via GPS');
       },
       () => {
         setGpsLoading(false);
@@ -138,38 +152,34 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
 
   const handleInputChange = (setter: (val: string) => void, val: string) => {
     setter(val);
-    setIsGpsFixed(false); // Enable automated search again on manual changes
+    setIsGpsFixed(false);
   };
 
   const handleSubmit = async () => {
     if (!name || !phone || !address || !city || !state) {
-      toast.error('Preencha nome, telefone, endereço, cidade e estado');
+      toast.error('Favor preencher todos os campos obrigatórios');
       return;
     }
     if (!user) return;
-
     setLoading(true);
 
     const fullAddress = `${address} - ${neighborhood || 'S/B'} - ${city} - ${state}`;
 
-    if (isEditMode) {
-      const { error } = await supabase
-        .from('customers')
-        .update({
-          name,
-          phone,
-          address: fullAddress,
-          birthday: birthday || null,
-          latitude: lat,
-          longitude: lng,
-        })
-        .eq('user_id', user.id);
+    const dataPayload = {
+      name,
+      phone,
+      address: fullAddress,
+      birthday: birthday || null,
+      latitude: lat,
+      longitude: lng,
+    };
 
+    if (isEditMode) {
+      const { error } = await supabase.from('customers').update(dataPayload).eq('user_id', user.id);
       setLoading(false);
-      if (error) {
-        toast.error('Erro ao atualizar: ' + error.message);
-      } else {
-        toast.success('Perfil atualizado com sucesso!');
+      if (error) toast.error('Erro ao atualizar: ' + error.message);
+      else {
+        toast.success('Perfil atualizado!');
         await queryClient.invalidateQueries({ queryKey: ['customer', user.id] });
         onComplete();
         onOpenChange(false);
@@ -177,47 +187,11 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
       return;
     }
 
-    // New registration name check
-    const { data: existingName } = await supabase
-      .from('customers')
-      .select('id')
-      .ilike('name', name)
-      .maybeSingle();
-
-    if (existingName) {
-      toast.error('Já existe um cadastro com este nome no sistema!');
-      setLoading(false);
-      return;
-    }
-
-    // New registration phone check
-    const { data: existingPhone } = await supabase
-      .from('customers')
-      .select('id')
-      .eq('phone', phone)
-      .maybeSingle();
-
-    if (existingPhone) {
-      toast.error('Este número de telefone já está cadastrado!');
-      setLoading(false);
-      return;
-    }
-
-    const { error } = await supabase.from('customers').insert({
-      user_id: user.id,
-      name,
-      phone,
-      address: fullAddress,
-      birthday: birthday || null,
-      latitude: lat,
-      longitude: lng,
-    });
+    const { error } = await supabase.from('customers').insert({ ...dataPayload, user_id: user.id });
     setLoading(false);
-
-    if (error) {
-      toast.error('Erro ao salvar: ' + error.message);
-    } else {
-      toast.success('Cadastro realizado com sucesso!');
+    if (error) toast.error('Erro ao salvar: ' + error.message);
+    else {
+      toast.success('Cadastro realizado!');
       await queryClient.invalidateQueries({ queryKey: ['customer', user.id] });
       onComplete();
       onOpenChange(false);
@@ -226,94 +200,111 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="h-[90vh] rounded-t-2xl p-0">
-        <SheetHeader className="p-4 border-b border-border">
-          <SheetTitle>{isEditMode ? 'Meu Perfil' : 'Complete seu Cadastro'}</SheetTitle>
+      <SheetContent side="bottom" className="h-[90vh] rounded-t-3xl border-t-0 p-0 overflow-hidden">
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-muted rounded-full z-10" />
+        
+        <SheetHeader className="p-6 pt-8 bg-background">
+          <SheetTitle className="text-2xl font-bold flex items-center gap-2">
+            {isEditMode ? 'Meu Perfil' : 'Complete seu Cadastro'}
+          </SheetTitle>
         </SheetHeader>
 
-        <div className="overflow-y-auto p-4 space-y-4" style={{ maxHeight: 'calc(90vh - 140px)' }}>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="md:col-span-2 space-y-4">
-              <div className="space-y-2">
-                <Label>Nome Completo *</Label>
-                <Input placeholder="Seu nome" value={name} onChange={e => handleInputChange(setName, e.target.value)} />
+        <div className="overflow-y-auto px-6 pb-6 space-y-6" style={{ maxHeight: 'calc(90vh - 180px)' }}>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Nome Completo</Label>
+                  <Input placeholder="Seu nome" value={name} onChange={e => handleInputChange(setName, e.target.value)} className="h-11 bg-muted/50 border-transparent focus:border-primary/20 focus:ring-primary/10" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Telefone</Label>
+                  <Input placeholder="(00) 00000-0000" value={phone} onChange={e => handleInputChange(setPhone, e.target.value)} className="h-11 bg-muted/50 border-transparent focus:border-primary/20 focus:ring-primary/10" />
+                </div>
               </div>
+
               <div className="space-y-2">
-                <Label>Telefone *</Label>
-                <Input placeholder="(00) 00000-0000" value={phone} onChange={e => handleInputChange(setPhone, e.target.value)} />
+                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Endereço Completo</Label>
+                <div className="relative">
+                  <Input placeholder="Ex: Rua Campo Largo, 100" value={address} onChange={e => handleInputChange(setAddress, e.target.value)} className="h-11 pl-10 bg-muted/50 border-transparent focus:border-primary/20 focus:ring-primary/10" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Bairro</Label>
+                  <Input placeholder="Bairro" value={neighborhood} onChange={e => handleInputChange(setNeighborhood, e.target.value)} className="h-11 bg-muted/50 border-transparent focus:border-primary/20 focus:ring-primary/10" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Cidade</Label>
+                  <Input placeholder="Cidade" value={city} onChange={e => handleInputChange(setCity, e.target.value)} className="h-11 bg-muted/50 border-transparent focus:border-primary/20 focus:ring-primary/10" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Estado</Label>
+                  <Input placeholder="Estado" value={state} onChange={e => handleInputChange(setState, e.target.value)} className="h-11 bg-muted/50 border-transparent focus:border-primary/20 focus:ring-primary/10" />
+                </div>
               </div>
             </div>
-            
-            <div className="space-y-2 group">
-              <Label className="flex justify-between">
-                Localização no Mapa
-                {isGpsFixed ? (
-                  <span className="text-[10px] text-primary font-bold">🎯 PONTO FIXADO</span>
-                ) : lat && (
-                  <span className="text-[10px] text-muted-foreground animate-pulse">🔍 Buscando...</span>
-                )}
-              </Label>
-              <div className="aspect-square md:aspect-auto md:h-full min-h-[120px] rounded-2xl bg-muted border border-border overflow-hidden relative shadow-inner">
-                {lat && lng ? (
-                  <iframe 
-                    width="100%" 
-                    height="100%" 
-                    frameBorder="0" 
-                    scrolling="no" 
-                    marginHeight={0} 
-                    marginWidth={0} 
-                    src={`https://www.openstreetmap.org/export/embed.html?bbox=${lng-0.002},${lat-0.002},${lng+0.002},${lat+0.002}&layer=mapnik&marker=${lat},${lng}`}
-                    className="opacity-80 group-hover:opacity-100 transition-opacity"
-                  />
+
+            <div className="space-y-3">
+              <div className="flex justify-between items-center px-1">
+                <Label className="text-xs font-bold uppercase text-primary">Preview de Localização</Label>
+                {isGpsFixed && <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold">🎯 FIXADO</span>}
+              </div>
+              
+              <div className="aspect-video lg:aspect-auto lg:h-[220px] rounded-3xl overflow-hidden border border-border bg-muted/30 relative group">
+                {!apiKey ? (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center space-y-2">
+                    <MapPin className="w-8 h-8 text-muted-foreground/30" />
+                    <p className="text-xs text-muted-foreground font-medium">Chave da Google API não encontrada.<br/>O mapa operará em modo demonstração.</p>
+                  </div>
+                ) : !isLoaded ? (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                  </div>
+                ) : lat && lng ? (
+                  <GoogleMap
+                    mapContainerStyle={mapContainerStyle}
+                    center={{ lat, lng }}
+                    zoom={17}
+                    options={{ disableDefaultUI: true, gestureHandling: 'greedy' }}
+                  >
+                    <MarkerF position={{ lat, lng }} animation={google.maps.Animation.DROP} />
+                  </GoogleMap>
                 ) : (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center">
-                    <MapPin className="w-8 h-8 text-muted-foreground/30 mb-2" />
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Aguardando endereço...</p>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center space-y-2">
+                    <MapPin className="w-8 h-8 text-muted-foreground/20" />
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground/50 tracking-widest">Aguardando coordenadas...</p>
                   </div>
                 )}
               </div>
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label>Endereço completo (Rua e Número) *</Label>
-            <Input placeholder="Ex: Rua das Flores, 123" value={address} onChange={e => handleInputChange(setAddress, e.target.value)} />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="sm:col-span-1 space-y-2">
-              <Label>Bairro *</Label>
-              <Input placeholder="Bairro" value={neighborhood} onChange={e => handleInputChange(setNeighborhood, e.target.value)} />
-            </div>
-            <div className="sm:col-span-1 space-y-2">
-              <Label>Cidade *</Label>
-              <Input placeholder="Cidade" value={city} onChange={e => handleInputChange(setCity, e.target.value)} />
-            </div>
-            <div className="sm:col-span-1 space-y-2">
-              <Label>Estado *</Label>
-              <Input placeholder="Estado" value={state} onChange={e => handleInputChange(setState, e.target.value)} />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Data de Aniversário</Label>
-              <Input type="date" value={birthday} onChange={e => setBirthday(e.target.value)} />
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Data de Aniversário</Label>
+              <Input type="date" value={birthday} onChange={e => setBirthday(e.target.value)} className="h-11 bg-muted/50 border-transparent focus:border-primary/10" />
             </div>
-
             <div className="space-y-2">
-              <Label>Obter GPS Automático</Label>
-              <Button variant="outline" className="w-full gap-2 hover:bg-primary/5 transition-colors" onClick={getLocation} disabled={gpsLoading}>
-                <MapPin className="w-4 h-4" />
-                {gpsLoading ? 'Obtendo...' : 'Capturar via GPS'}
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Calibrar Localização</Label>
+              <Button variant="outline" className="w-full h-11 gap-2 border-dashed hover:border-primary hover:bg-primary/5 transition-all text-sm font-medium" onClick={getLocation} disabled={gpsLoading}>
+                <MapPin className={`w-4 h-4 ${gpsLoading ? 'animate-bounce' : ''}`} />
+                {gpsLoading ? 'Rastreando sinal...' : 'Confirmar ponto atual via GPS'}
               </Button>
             </div>
           </div>
         </div>
 
-        <div className="border-t border-border p-4 safe-bottom">
-          <Button size="lg" className="w-full shadow-lg shadow-primary/20" onClick={handleSubmit} disabled={loading}>
-            {loading ? 'Salvando...' : isEditMode ? 'Atualizar Perfil' : 'Salvar Cadastro'}
+        <div className="p-6 bg-gradient-to-t from-background via-background to-transparent pt-10 mt-auto border-t border-border/50">
+          <Button size="lg" className="w-full h-14 rounded-2xl shadow-xl shadow-primary/20 text-base font-bold transition-transform active:scale-95" onClick={handleSubmit} disabled={loading}>
+            {loading ? (
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Processando...
+              </div>
+            ) : isEditMode ? 'Salvar Alterações no Perfil' : 'Finalizar e Começar Agora'}
           </Button>
         </div>
       </SheetContent>
