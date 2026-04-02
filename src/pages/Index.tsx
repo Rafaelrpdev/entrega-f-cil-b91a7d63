@@ -34,8 +34,14 @@ const Index = () => {
   const { data: isAdmin } = useQuery({
     queryKey: ['is-admin', user?.id],
     queryFn: async () => {
-      const { data } = await supabase.rpc('has_role', { _user_id: user!.id, _role: 'admin' });
-      return !!data;
+      try {
+        const { data, error } = await supabase.rpc('has_role', { _user_id: user!.id, _role: 'admin' });
+        if (error) return false;
+        return !!data;
+      } catch (e) {
+        // Fallback for when RPC doesn't exist yet
+        return false;
+      }
     },
     enabled: !!user,
   });

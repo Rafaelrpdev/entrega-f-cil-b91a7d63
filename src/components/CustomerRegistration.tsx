@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,7 +25,34 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
   const [lng, setLng] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [gpsLoading, setGpsLoading] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
   const queryClient = useQueryClient();
+
+  // Load existing data when opening
+  useEffect(() => {
+    if (open && user) {
+      const loadProfile = async () => {
+        const { data } = await supabase
+          .from('customers')
+          .select('*')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (data) {
+          setName(data.name || '');
+          setPhone(data.phone || '');
+          setAddress(data.address || '');
+          setBirthday(data.birthday || '');
+          setLat(data.latitude || null);
+          setLng(data.longitude || null);
+          setIsEditMode(true);
+        } else {
+          setIsEditMode(false);
+        }
+      };
+      loadProfile();
+    }
+  }, [open, user]);
 
   const getLocation = () => {
     if (!navigator.geolocation) {
@@ -71,6 +98,32 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
       return;
     }
 
+    if (isEditMode) {
+      const { error } = await supabase
+        .from('customers')
+        .update({
+          name,
+          phone,
+          address,
+          birthday: birthday || null,
+          latitude: lat,
+          longitude: lng,
+        })
+        .eq('user_id', user.id);
+
+      setLoading(false);
+      if (error) {
+        toast.error('Erro ao atualizar: ' + error.message);
+      } else {
+        toast.success('Perfil atualizado com sucesso!');
+        await queryClient.invalidateQueries({ queryKey: ['customer', user.id] });
+        onComplete();
+        onOpenChange(false);
+      }
+      return;
+    }
+
+    // New registration check
     const { data: existingPhone } = await supabase
       .from('customers')
       .select('id')
@@ -80,21 +133,6 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
     if (existingPhone) {
       toast.error('Este número de telefone já está cadastrado!');
       setLoading(false);
-      return;
-    }
-
-    const { data: existingUser } = await supabase
-      .from('customers')
-      .select('id')
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    if (existingUser) {
-      toast.error('Usuário já cadastrado');
-      queryClient.invalidateQueries({ queryKey: ['customer', user.id] });
-      setLoading(false);
-      onComplete();
-      onOpenChange(false);
       return;
     }
 
@@ -123,7 +161,7 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="h-[90vh] rounded-t-2xl p-0">
         <SheetHeader className="p-4 border-b border-border">
-          <SheetTitle>Complete seu Cadastro</SheetTitle>
+          <SheetTitle>{isEditMode ? 'Meu Perfil' : 'Complete seu Cadastro'}</SheetTitle>
         </SheetHeader>
 
         <div className="overflow-y-auto p-4 space-y-4" style={{ maxHeight: 'calc(90vh - 140px)' }}>
@@ -155,7 +193,7 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
 
         <div className="border-t border-border p-4 safe-bottom">
           <Button size="lg" className="w-full" onClick={handleSubmit} disabled={loading}>
-            {loading ? 'Salvando...' : 'Salvar Cadastro'}
+            {loading ? 'Salvando...' : isEditMode ? 'Atualizar Perfil' : 'Salvar Cadastro'}
           </Button>
         </div>
       </SheetContent>
