@@ -102,11 +102,39 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
     }
     setGpsLoading(true);
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLat(pos.coords.latitude);
-        setLng(pos.coords.longitude);
-        setGpsLoading(false);
-        toast.success('Localização capturada!');
+      async (pos) => {
+        const { latitude, longitude } = pos.coords;
+        setLat(latitude);
+        setLng(longitude);
+        
+        try {
+          // Reverse Geocoding: Coord -> Address
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+          const data = await res.json();
+          
+          if (data && data.address) {
+            const addr = data.address;
+            const road = addr.road || '';
+            const houseNumber = addr.house_number ? `, ${addr.house_number}` : '';
+            const neighborhoodName = addr.suburb || addr.neighbourhood || addr.village || addr.city_district || '';
+            const cityName = addr.city || addr.town || addr.municipality || '';
+            const stateName = addr.state || '';
+
+            if (road) setAddress(road + houseNumber);
+            if (neighborhoodName) setNeighborhood(neighborhoodName);
+            if (cityName) setCity(cityName);
+            if (stateName) setState(stateName);
+            
+            toast.success('Endereço atualizado via GPS!');
+          } else {
+            toast.success('Localização capturada!');
+          }
+        } catch (err) {
+          console.error("Reverse geocoding error:", err);
+          toast.success('Localização capturada (Erro ao buscar endereço)');
+        } finally {
+          setGpsLoading(false);
+        }
       },
       () => {
         setGpsLoading(false);
