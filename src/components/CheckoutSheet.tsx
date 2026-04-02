@@ -188,7 +188,7 @@ export default function CheckoutSheet({ open, onOpenChange }: Props) {
           <SheetTitle>Finalizar Pedido</SheetTitle>
         </SheetHeader>
 
-        <div className="overflow-y-auto p-4 space-y-5" style={{ maxHeight: 'calc(90vh - 140px)' }}>
+        <div className="overflow-y-auto p-4 space-y-5 safe-bottom" style={{ maxHeight: 'calc(90vh - 88px)' }}>
           <div className="space-y-3">
             <h3 className="font-semibold text-foreground text-sm">Seus Dados</h3>
             <div className="space-y-2">
@@ -209,7 +209,6 @@ export default function CheckoutSheet({ open, onOpenChange }: Props) {
             </div>
           </div>
 
-          {/* Coupon Section */}
           <div className="space-y-3">
             <h3 className="font-semibold text-foreground text-sm flex items-center gap-1.5">
               <Tag className="w-4 h-4" /> Cupom de Desconto
@@ -262,49 +261,51 @@ export default function CheckoutSheet({ open, onOpenChange }: Props) {
           </div>
 
           {timing && (
-            <div className="space-y-3">
-              <h3 className="font-semibold text-foreground text-sm">Forma de Pagamento</h3>
-              <div className="grid grid-cols-2 gap-2">
-                {availableMethods.map(m => {
-                  const Icon = paymentIcons[m];
-                  return (
-                    <button
-                      key={m}
-                      onClick={() => setMethod(m)}
-                      className={`p-3 rounded-xl border text-sm font-medium transition-colors flex items-center gap-2 ${
-                        method === m ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-card text-foreground'
-                      }`}
-                    >
-                      <Icon className="w-4 h-4" />
-                      {paymentLabels[m]}
-                    </button>
-                  );
-                })}
+            <div className="space-y-4">
+              <div className="space-y-3">
+                <h3 className="font-semibold text-foreground text-sm">Forma de Pagamento</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  {availableMethods.map(m => {
+                    const Icon = paymentIcons[m];
+                    return (
+                      <button
+                        key={m}
+                        onClick={() => setMethod(m)}
+                        className={`p-3 rounded-xl border text-sm font-medium transition-colors flex items-center gap-2 ${
+                          method === m ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-card text-foreground'
+                        }`}
+                      >
+                        <Icon className="w-4 h-4" />
+                        {paymentLabels[m]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">Subtotal</span>
+                    <span className="text-foreground">R$ {totalPrice.toFixed(2).replace('.', ',')}</span>
+                  </div>
+                  {appliedCoupon && (
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-success">Desconto ({appliedCoupon.code})</span>
+                      <span className="text-success font-medium">-R$ {discount.toFixed(2).replace('.', ',')}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center pt-1">
+                    <span className="font-medium text-foreground">Total</span>
+                    <span className="text-xl font-bold text-primary">R$ {finalTotal.toFixed(2).replace('.', ',')}</span>
+                  </div>
+                </div>
+                <Button size="lg" className="w-full text-base" onClick={handleSubmit} disabled={!name || !phone || !address || !timing || !method}>
+                  Confirmar Pedido
+                </Button>
               </div>
             </div>
           )}
-        </div>
-
-        <div className="border-t border-border p-4 safe-bottom">
-          <div className="space-y-1 mb-3">
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-muted-foreground">Subtotal</span>
-              <span className="text-foreground">R$ {totalPrice.toFixed(2).replace('.', ',')}</span>
-            </div>
-            {appliedCoupon && (
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-success">Desconto ({appliedCoupon.code})</span>
-                <span className="text-success font-medium">-R$ {discount.toFixed(2).replace('.', ',')}</span>
-              </div>
-            )}
-            <div className="flex justify-between items-center">
-              <span className="font-medium text-foreground">Total</span>
-              <span className="text-xl font-bold text-primary">R$ {finalTotal.toFixed(2).replace('.', ',')}</span>
-            </div>
-          </div>
-          <Button size="lg" className="w-full text-base" onClick={handleSubmit} disabled={!name || !phone || !address || !timing || !method}>
-            Confirmar Pedido
-          </Button>
         </div>
       </SheetContent>
     </Sheet>
