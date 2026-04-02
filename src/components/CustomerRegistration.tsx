@@ -29,6 +29,7 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
   const [loading, setLoading] = useState(false);
   const [gpsLoading, setGpsLoading] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [isGpsFixed, setIsGpsFixed] = useState(false);
   const queryClient = useQueryClient();
 
   // Load existing data when opening
@@ -62,23 +63,28 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
           }
           
           setBirthday(data.birthday || '');
-          setLat(data.latitude || null);
-          setLng(data.longitude || null);
+          if (data.latitude && data.longitude) {
+            setLat(data.latitude);
+            setLng(data.longitude);
+            setIsGpsFixed(true); // Lock it to the saved coordinates
+          }
           setIsEditMode(true);
         } else {
           setIsEditMode(false);
+          setIsGpsFixed(false);
         }
       };
       loadProfile();
     }
   }, [open, user]);
 
-  // Automatic geocoding (Debounced)
+  // Automatic geocoding (Debounced) - Only if not GPS fixed
   useEffect(() => {
-    if (!address || !city) return;
+    if (!address || !city || isGpsFixed) return;
     
     const handler = setTimeout(async () => {
-      const fullAddress = `${address}, ${neighborhood}, ${city}${state ? `, ${state}` : ''}`;
+      // Improved query with state, city and country for better precision (avoid Curitiba vs Campo Largo mixup)
+      const fullAddress = `${address}, ${neighborhood}, ${city}, ${state}, Brasil`;
       try {
         const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fullAddress)}`);
         const results = await response.json();
@@ -90,10 +96,10 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
       } catch (err) {
         console.error("Geocoding error:", err);
       }
-    }, 1500); // 1.5s delay after typing
+    }, 1500);
 
     return () => clearTimeout(handler);
-  }, [address, neighborhood, city, state]);
+  }, [address, neighborhood, city, state, isGpsFixed]);
 
   const getLocation = () => {
     if (!navigator.geolocation) {
@@ -102,18 +108,37 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
     }
     setGpsLoading(true);
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
+      async (pos) => {
         const { latitude, longitude } = pos.coords;
         setLat(latitude);
         setLng(longitude);
-        setGpsLoading(false);
-        toast.success('Ponto marcado no mapa via GPS!');
+        setIsGpsFixed(true); // Mark it as GPS fixed
+        
+        try {
+          // Reverse geocoding to update fields (to ensure city/state match GPS context)
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+          const data = await res.json();
+          if (data && data.address) {
+            if (data.address.city || data.address.town) setCity(data.address.city || data.address.town);
+            if (data.address.state) setState(data.address.state);
+          }
+          toast.success('Ponto marcado no mapa via GPS!');
+        } catch (err) {
+          toast.success('Ponto marcado!');
+        } finally {
+          setGpsLoading(false);
+        }
       },
       () => {
         setGpsLoading(false);
         toast.error('Não foi possível obter a localização');
       }
     );
+  };
+
+  const handleInputChange = (setter: (val: string) => void, val: string) => {
+    setter(val);
+    setIsGpsFixed(false); // Enable automated search again on manual changes
   };
 
   const handleSubmit = async () => {
@@ -211,18 +236,22 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
             <div className="md:col-span-2 space-y-4">
               <div className="space-y-2">
                 <Label>Nome Completo *</Label>
-                <Input placeholder="Seu nome" value={name} onChange={e => setName(e.target.value)} />
+                <Input placeholder="Seu nome" value={name} onChange={e => handleInputChange(setName, e.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label>Telefone *</Label>
-                <Input placeholder="(00) 00000-0000" value={phone} onChange={e => setPhone(e.target.value)} />
+                <Input placeholder="(00) 00000-0000" value={phone} onChange={e => handleInputChange(setPhone, e.target.value)} />
               </div>
             </div>
             
             <div className="space-y-2 group">
               <Label className="flex justify-between">
                 Localização no Mapa
-                {lat && <span className="text-[10px] text-primary animate-pulse">📍 Sincronizado</span>}
+                {isGpsFixed ? (
+                  <span className="text-[10px] text-primary font-bold">🎯 PONTO FIXADO</span>
+                ) : lat && (
+                  <span className="text-[10px] text-muted-foreground animate-pulse">🔍 Buscando...</span>
+                )}
               </Label>
               <div className="aspect-square md:aspect-auto md:h-full min-h-[120px] rounded-2xl bg-muted border border-border overflow-hidden relative shadow-inner">
                 {lat && lng ? (
@@ -233,7 +262,7 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
                     scrolling="no" 
                     marginHeight={0} 
                     marginWidth={0} 
-                    src={`https://www.openstreetmap.org/export/embed.html?bbox=${lng-0.005},${lat-0.005},${lng+0.005},${lat+0.005}&layer=mapnik&marker=${lat},${lng}`}
+                    src={`https://www.openstreetmap.org/export/embed.html?bbox=${lng-0.002},${lat-0.002},${lng+0.002},${lat+0.002}&layer=mapnik&marker=${lat},${lng}`}
                     className="opacity-80 group-hover:opacity-100 transition-opacity"
                   />
                 ) : (
@@ -248,21 +277,21 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
 
           <div className="space-y-2">
             <Label>Endereço completo (Rua e Número) *</Label>
-            <Input placeholder="Ex: Rua das Flores, 123" value={address} onChange={e => setAddress(e.target.value)} />
+            <Input placeholder="Ex: Rua das Flores, 123" value={address} onChange={e => handleInputChange(setAddress, e.target.value)} />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="sm:col-span-1 space-y-2">
               <Label>Bairro *</Label>
-              <Input placeholder="Bairro" value={neighborhood} onChange={e => setNeighborhood(e.target.value)} />
+              <Input placeholder="Bairro" value={neighborhood} onChange={e => handleInputChange(setNeighborhood, e.target.value)} />
             </div>
             <div className="sm:col-span-1 space-y-2">
               <Label>Cidade *</Label>
-              <Input placeholder="Cidade" value={city} onChange={e => setCity(e.target.value)} />
+              <Input placeholder="Cidade" value={city} onChange={e => handleInputChange(setCity, e.target.value)} />
             </div>
             <div className="sm:col-span-1 space-y-2">
               <Label>Estado *</Label>
-              <Input placeholder="Estado" value={state} onChange={e => setState(e.target.value)} />
+              <Input placeholder="Estado" value={state} onChange={e => handleInputChange(setState, e.target.value)} />
             </div>
           </div>
 
