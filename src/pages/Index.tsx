@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { ShoppingCart, User, LogOut, Shield, Package, HelpCircle } from 'lucide-react';
+import { ShoppingCart, User, LogOut, Shield, Package, HelpCircle, Moon, Sun } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useTheme } from 'next-themes';
 import { AnimatePresence } from 'framer-motion';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import ProductCard from '@/components/ProductCard';
 import ProductDetail from '@/components/ProductDetail';
@@ -27,6 +28,7 @@ const Index = () => {
   const [registrationOpen, setRegistrationOpen] = useState(false);
   const { totalItems } = useCart();
   const { user, signOut } = useAuth();
+  const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
 
   const { data: isAdmin } = useQuery({
@@ -56,12 +58,20 @@ const Index = () => {
     enabled: !!user,
   });
 
+  const queryClient = useQueryClient();
+
   // Prompt registration if logged in but no customer profile
   useEffect(() => {
-    if (user && customer === null) {
+    // Only open if we ARE sure customer is null (finished loading and not found)
+    if (user && customer === null && !registrationOpen) {
       setRegistrationOpen(true);
     }
   }, [user, customer]);
+
+  const handleRegistrationComplete = () => {
+    queryClient.invalidateQueries({ queryKey: ['customer', user?.id] });
+    setRegistrationOpen(false);
+  };
 
   const products: Product[] = (dbProducts || []).map(p => ({
     id: p.id,
@@ -77,7 +87,7 @@ const Index = () => {
       <header className="sticky top-0 z-40 bg-card/80 backdrop-blur-md border-b border-border">
         <div className="max-w-2xl mx-auto flex items-center justify-between px-4 py-3">
           <div>
-            <h1 className="text-lg font-bold text-foreground">Gás & Água Express</h1>
+            <h1 className="text-lg font-bold text-foreground">Gás Santo Antonio</h1>
             <p className="text-xs text-muted-foreground">Delivery rápido e seguro</p>
           </div>
           <div className="flex items-center gap-2">
@@ -97,6 +107,14 @@ const Index = () => {
                 <User className="w-5 h-5" />
               </button>
             )}
+            <button 
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} 
+              className="relative p-2.5 rounded-xl bg-muted text-muted-foreground hover:bg-muted/80 transition-colors" 
+              title="Alternar Tema"
+            >
+              <Sun className="w-5 h-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+              <Moon className="absolute left-2.5 top-2.5 w-5 h-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+            </button>
             <button onClick={() => setCartOpen(true)} className="relative p-2.5 rounded-xl bg-primary/10 text-primary">
               <ShoppingCart className="w-5 h-5" />
               {totalItems > 0 && (
@@ -172,7 +190,11 @@ const Index = () => {
 
       <CartSheet open={cartOpen} onOpenChange={setCartOpen} />
       <AuthSheet open={authOpen} onOpenChange={setAuthOpen} />
-      <CustomerRegistration open={registrationOpen} onOpenChange={setRegistrationOpen} onComplete={() => {}} />
+      <CustomerRegistration 
+        open={registrationOpen} 
+        onOpenChange={setRegistrationOpen} 
+        onComplete={handleRegistrationComplete} 
+      />
     </div>
   );
 };

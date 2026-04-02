@@ -22,3 +22,14 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Env Files
+.env
+.env.local
+.env.*.local
+
+# Temporary Diagnostic Scripts
+cleanup_db.js
+debug_duplicates.js
+clean_duplicates.js
+lint_output.txt

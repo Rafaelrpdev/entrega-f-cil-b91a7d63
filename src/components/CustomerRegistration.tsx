@@ -7,6 +7,7 @@ import { MapPin } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface Props {
   open: boolean;
@@ -24,6 +25,7 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
   const [lng, setLng] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [gpsLoading, setGpsLoading] = useState(false);
+  const queryClient = useQueryClient();
 
   const getLocation = () => {
     if (!navigator.geolocation) {
@@ -53,6 +55,49 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
     if (!user) return;
 
     setLoading(true);
+
+    const { data: existingName } = await supabase
+      .from('customers')
+      .select('id')
+      .ilike('name', name)
+      .maybeSingle();
+
+    if (existingName) {
+      toast.error('Já existe um cadastro com este nome no sistema!');
+      setLoading(false);
+      // Even if it exists, if the auth user is seeing the sheet, maybe this record belongs to them?
+      // Or they tried to use a name that is already taken. 
+      // We don't call onComplete here because we want them to fix the name.
+      return;
+    }
+
+    const { data: existingPhone } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('phone', phone)
+      .maybeSingle();
+
+    if (existingPhone) {
+      toast.error('Este número de telefone já está cadastrado!');
+      setLoading(false);
+      return;
+    }
+
+    const { data: existingUser } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (existingUser) {
+      toast.error('Usuário já cadastrado');
+      queryClient.invalidateQueries({ queryKey: ['customer', user.id] });
+      setLoading(false);
+      onComplete();
+      onOpenChange(false);
+      return;
+    }
+
     const { error } = await supabase.from('customers').insert({
       user_id: user.id,
       name,
@@ -67,7 +112,8 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
     if (error) {
       toast.error('Erro ao salvar: ' + error.message);
     } else {
-      toast.success('Cadastro realizado!');
+      toast.success('Cadastro realizado com sucesso!');
+      await queryClient.invalidateQueries({ queryKey: ['customer', user.id] });
       onComplete();
       onOpenChange(false);
     }

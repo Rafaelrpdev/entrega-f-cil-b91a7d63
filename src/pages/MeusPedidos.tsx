@@ -96,7 +96,7 @@ export default function MeusPedidos() {
                 </div>
 
                 <div className="space-y-1">
-                  {(order.order_items as any[])?.map((item: any) => (
+                  {(order.order_items as { id: string; quantity: number; total_price: number; products?: { name: string } }[])?.map((item) => (
                     <div key={item.id} className="flex justify-between text-sm">
                       <span className="text-foreground">
                         {item.quantity}x {item.products?.name || 'Produto'}

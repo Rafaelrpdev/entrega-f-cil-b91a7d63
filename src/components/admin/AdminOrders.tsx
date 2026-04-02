@@ -17,6 +17,18 @@ const statusLabels: Record<string, string> = {
   pending: 'Pendente', confirmed: 'Confirmado', delivering: 'Em entrega', delivered: 'Entregue', cancelled: 'Cancelado',
 };
 
+type AdminOrder = {
+  id: string;
+  status: string;
+  total: number;
+  created_at: string;
+  payment_method: string;
+  payment_timing: string;
+  customers: { name: string; phone: string; address: string };
+  order_items: { id: string; quantity: number; total_price: number; products: { name: string } }[];
+};
+
+
 export default function AdminOrders() {
   const qc = useQueryClient();
 
@@ -49,7 +61,7 @@ export default function AdminOrders() {
     <div className="space-y-3">
       <h2 className="text-base font-semibold text-foreground">Pedidos ({orders.length})</h2>
       {orders.length === 0 && <p className="text-sm text-muted-foreground">Nenhum pedido ainda.</p>}
-      {orders.map((order: any) => (
+      {orders.map((order: AdminOrder) => (
         <Card key={order.id}>
           <CardContent className="p-3 space-y-2">
             <div className="flex items-start justify-between gap-2">
@@ -62,7 +74,7 @@ export default function AdminOrders() {
             </div>
 
             <div className="bg-muted/50 rounded-lg p-2 space-y-1">
-              {order.order_items?.map((item: any) => (
+              {order.order_items?.map((item) => (
                 <div key={item.id} className="flex justify-between text-xs">
                   <span>{item.quantity}x {item.products?.name || 'Produto'}</span>
                   <span className="text-muted-foreground">R$ {Number(item.total_price).toFixed(2)}</span>

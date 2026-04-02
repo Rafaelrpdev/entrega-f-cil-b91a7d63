@@ -3,6 +3,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DollarSign, TrendingUp, Package, ShoppingBag } from 'lucide-react';
 
+type FinanceOrderItem = { quantity: number; total_price: number; product_id: string; products: { name: string; cost_price: number } };
+type FinanceOrder = { id: string; status: string; total: number; order_items: FinanceOrderItem[] };
+type FinanceProduct = { id: string; name: string; sale_price: number; cost_price: number };
+
 export default function AdminFinance() {
   const { data: orders = [] } = useQuery({
     queryKey: ['admin-orders'],
@@ -22,12 +26,12 @@ export default function AdminFinance() {
     },
   });
 
-  const delivered = orders.filter((o: any) => o.status === 'delivered');
-  const pending = orders.filter((o: any) => o.status === 'pending');
+  const delivered = orders.filter((o: FinanceOrder) => o.status === 'delivered');
+  const pending = orders.filter((o: FinanceOrder) => o.status === 'pending');
 
-  const totalRevenue = delivered.reduce((sum: number, o: any) => sum + Number(o.total), 0);
-  const totalCost = delivered.reduce((sum: number, o: any) => {
-    return sum + (o.order_items || []).reduce((s: number, item: any) => s + Number(item.products?.cost_price || 0) * item.quantity, 0);
+  const totalRevenue = delivered.reduce((sum: number, o: FinanceOrder) => sum + Number(o.total), 0);
+  const totalCost = delivered.reduce((sum: number, o: FinanceOrder) => {
+    return sum + (o.order_items || []).reduce((s: number, item: FinanceOrderItem) => s + Number(item.products?.cost_price || 0) * item.quantity, 0);
   }, 0);
   const profit = totalRevenue - totalCost;
 
@@ -40,8 +44,8 @@ export default function AdminFinance() {
 
   // Top products by quantity sold
   const productSales: Record<string, { name: string; qty: number; revenue: number }> = {};
-  delivered.forEach((o: any) => {
-    (o.order_items || []).forEach((item: any) => {
+  delivered.forEach((o: FinanceOrder) => {
+    (o.order_items || []).forEach((item: FinanceOrderItem) => {
       const pid = item.product_id;
       if (!productSales[pid]) productSales[pid] = { name: item.products?.name || 'Produto', qty: 0, revenue: 0 };
       productSales[pid].qty += item.quantity;
@@ -98,7 +102,7 @@ export default function AdminFinance() {
             <p className="text-xs text-muted-foreground">Nenhum produto cadastrado.</p>
           ) : (
             <div className="space-y-2">
-              {products.map((p: any) => {
+              {products.map((p: FinanceProduct) => {
                 const margin = Number(p.sale_price) - Number(p.cost_price);
                 const pct = Number(p.sale_price) > 0 ? (margin / Number(p.sale_price) * 100).toFixed(0) : '0';
                 return (
