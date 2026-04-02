@@ -22,6 +22,7 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
   const [address, setAddress] = useState('');
   const [neighborhood, setNeighborhood] = useState('');
   const [city, setCity] = useState('');
+  const [state, setState] = useState('');
   const [birthday, setBirthday] = useState('');
   const [lat, setLat] = useState<number | null>(null);
   const [lng, setLng] = useState<number | null>(null);
@@ -44,12 +45,18 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
           setName(data.name || '');
           setPhone(data.phone || '');
           
-          // Try to parse: "Rua, Num - Bairro - Cidade"
+          // Try to parse: "Rua, Num - Bairro - Cidade - Estado"
           const parts = data.address?.split(' - ') || [];
-          if (parts.length >= 3) {
+          if (parts.length >= 4) {
             setAddress(parts[0]);
             setNeighborhood(parts[1]);
             setCity(parts[2]);
+            setState(parts[3]);
+          } else if (parts.length >= 3) {
+            setAddress(parts[0]);
+            setNeighborhood(parts[1]);
+            setCity(parts[2]);
+            setState('');
           } else {
             setAddress(data.address || '');
           }
@@ -71,7 +78,7 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
     if (!address || !city) return;
     
     const handler = setTimeout(async () => {
-      const fullAddress = `${address}, ${neighborhood}, ${city}`;
+      const fullAddress = `${address}, ${neighborhood}, ${city}${state ? `, ${state}` : ''}`;
       try {
         const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fullAddress)}`);
         const results = await response.json();
@@ -86,7 +93,7 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
     }, 1500); // 1.5s delay after typing
 
     return () => clearTimeout(handler);
-  }, [address, neighborhood, city]);
+  }, [address, neighborhood, city, state]);
 
   const getLocation = () => {
     if (!navigator.geolocation) {
@@ -109,15 +116,15 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
   };
 
   const handleSubmit = async () => {
-    if (!name || !phone || !address || !city) {
-      toast.error('Preencha nome, telefone, endereço e cidade');
+    if (!name || !phone || !address || !city || !state) {
+      toast.error('Preencha nome, telefone, endereço, cidade e estado');
       return;
     }
     if (!user) return;
 
     setLoading(true);
 
-    const fullAddress = neighborhood ? `${address} - ${neighborhood} - ${city}` : `${address} - ${city}`;
+    const fullAddress = `${address} - ${neighborhood || 'S/B'} - ${city} - ${state}`;
 
     if (isEditMode) {
       const { error } = await supabase
@@ -243,14 +250,18 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
             <Input placeholder="Ex: Rua das Flores, 123" value={address} onChange={e => setAddress(e.target.value)} />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="sm:col-span-1 space-y-2">
               <Label>Bairro *</Label>
-              <Input placeholder="Seu bairro" value={neighborhood} onChange={e => setNeighborhood(e.target.value)} />
+              <Input placeholder="Bairro" value={neighborhood} onChange={e => setNeighborhood(e.target.value)} />
             </div>
-            <div className="space-y-2">
+            <div className="sm:col-span-1 space-y-2">
               <Label>Cidade *</Label>
-              <Input placeholder="Sua cidade" value={city} onChange={e => setCity(e.target.value)} />
+              <Input placeholder="Cidade" value={city} onChange={e => setCity(e.target.value)} />
+            </div>
+            <div className="sm:col-span-1 space-y-2">
+              <Label>Estado *</Label>
+              <Input placeholder="Estado" value={state} onChange={e => setState(e.target.value)} />
             </div>
           </div>
 
