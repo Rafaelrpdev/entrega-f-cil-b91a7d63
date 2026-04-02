@@ -20,6 +20,8 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
+  const [neighborhood, setNeighborhood] = useState('');
+  const [city, setCity] = useState('');
   const [birthday, setBirthday] = useState('');
   const [lat, setLat] = useState<number | null>(null);
   const [lng, setLng] = useState<number | null>(null);
@@ -41,7 +43,17 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
         if (data) {
           setName(data.name || '');
           setPhone(data.phone || '');
-          setAddress(data.address || '');
+          
+          // Try to parse: "Rua, Num - Bairro - Cidade"
+          const parts = data.address?.split(' - ') || [];
+          if (parts.length >= 3) {
+            setAddress(parts[0]);
+            setNeighborhood(parts[1]);
+            setCity(parts[2]);
+          } else {
+            setAddress(data.address || '');
+          }
+          
           setBirthday(data.birthday || '');
           setLat(data.latitude || null);
           setLng(data.longitude || null);
@@ -53,6 +65,28 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
       loadProfile();
     }
   }, [open, user]);
+
+  // Automatic geocoding (Debounced)
+  useEffect(() => {
+    if (!address || !city) return;
+    
+    const handler = setTimeout(async () => {
+      const fullAddress = `${address}, ${neighborhood}, ${city}`;
+      try {
+        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fullAddress)}`);
+        const results = await response.json();
+        if (results && results.length > 0) {
+          const { lat: newLat, lon: newLng } = results[0];
+          setLat(parseFloat(newLat));
+          setLng(parseFloat(newLng));
+        }
+      } catch (err) {
+        console.error("Geocoding error:", err);
+      }
+    }, 1500); // 1.5s delay after typing
+
+    return () => clearTimeout(handler);
+  }, [address, neighborhood, city]);
 
   const getLocation = () => {
     if (!navigator.geolocation) {
@@ -75,28 +109,15 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
   };
 
   const handleSubmit = async () => {
-    if (!name || !phone || !address) {
-      toast.error('Preencha nome, telefone e endereço');
+    if (!name || !phone || !address || !city) {
+      toast.error('Preencha nome, telefone, endereço e cidade');
       return;
     }
     if (!user) return;
 
     setLoading(true);
 
-    const { data: existingName } = await supabase
-      .from('customers')
-      .select('id')
-      .ilike('name', name)
-      .maybeSingle();
-
-    if (existingName) {
-      toast.error('Já existe um cadastro com este nome no sistema!');
-      setLoading(false);
-      // Even if it exists, if the auth user is seeing the sheet, maybe this record belongs to them?
-      // Or they tried to use a name that is already taken. 
-      // We don't call onComplete here because we want them to fix the name.
-      return;
-    }
+    const fullAddress = neighborhood ? `${address} - ${neighborhood} - ${city}` : `${address} - ${city}`;
 
     if (isEditMode) {
       const { error } = await supabase
@@ -104,7 +125,7 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
         .update({
           name,
           phone,
-          address,
+          address: fullAddress,
           birthday: birthday || null,
           latitude: lat,
           longitude: lng,
@@ -123,7 +144,20 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
       return;
     }
 
-    // New registration check
+    // New registration name check
+    const { data: existingName } = await supabase
+      .from('customers')
+      .select('id')
+      .ilike('name', name)
+      .maybeSingle();
+
+    if (existingName) {
+      toast.error('Já existe um cadastro com este nome no sistema!');
+      setLoading(false);
+      return;
+    }
+
+    // New registration phone check
     const { data: existingPhone } = await supabase
       .from('customers')
       .select('id')
@@ -140,7 +174,7 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
       user_id: user.id,
       name,
       phone,
-      address,
+      address: fullAddress,
       birthday: birthday || null,
       latitude: lat,
       longitude: lng,
@@ -179,8 +213,8 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
             
             <div className="space-y-2 group">
               <Label className="flex justify-between">
-                Sua Localização 
-                {lat && <span className="text-[10px] text-muted-foreground">📍 GPS Ativo</span>}
+                Localização no Mapa
+                {lat && <span className="text-[10px] text-primary animate-pulse">📍 Sincronizado</span>}
               </Label>
               <div className="aspect-square md:aspect-auto md:h-full min-h-[120px] rounded-2xl bg-muted border border-border overflow-hidden relative shadow-inner">
                 {lat && lng ? (
@@ -197,7 +231,7 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
                 ) : (
                   <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center">
                     <MapPin className="w-8 h-8 text-muted-foreground/30 mb-2" />
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Mapa não definido</p>
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Aguardando endereço...</p>
                   </div>
                 )}
               </div>
@@ -205,25 +239,39 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
           </div>
 
           <div className="space-y-2">
-            <Label>Endereço *</Label>
-            <Input placeholder="Rua, número, bairro" value={address} onChange={e => setAddress(e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label>Data de Aniversário</Label>
-            <Input type="date" value={birthday} onChange={e => setBirthday(e.target.value)} />
+            <Label>Endereço completo (Rua e Número) *</Label>
+            <Input placeholder="Ex: Rua das Flores, 123" value={address} onChange={e => setAddress(e.target.value)} />
           </div>
 
-          <div className="space-y-2">
-            <Label>Localização</Label>
-            <Button variant="outline" className="w-full gap-2" onClick={getLocation} disabled={gpsLoading}>
-              <MapPin className="w-4 h-4" />
-              {gpsLoading ? 'Obtendo...' : lat ? `📍 ${lat.toFixed(4)}, ${lng?.toFixed(4)}` : 'Enviar minha localização'}
-            </Button>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>Bairro *</Label>
+              <Input placeholder="Seu bairro" value={neighborhood} onChange={e => setNeighborhood(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Cidade *</Label>
+              <Input placeholder="Sua cidade" value={city} onChange={e => setCity(e.target.value)} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>Data de Aniversário</Label>
+              <Input type="date" value={birthday} onChange={e => setBirthday(e.target.value)} />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Obter GPS Automático</Label>
+              <Button variant="outline" className="w-full gap-2 hover:bg-primary/5 transition-colors" onClick={getLocation} disabled={gpsLoading}>
+                <MapPin className="w-4 h-4" />
+                {gpsLoading ? 'Obtendo...' : 'Capturar via GPS'}
+              </Button>
+            </div>
           </div>
         </div>
 
         <div className="border-t border-border p-4 safe-bottom">
-          <Button size="lg" className="w-full" onClick={handleSubmit} disabled={loading}>
+          <Button size="lg" className="w-full shadow-lg shadow-primary/20" onClick={handleSubmit} disabled={loading}>
             {loading ? 'Salvando...' : isEditMode ? 'Atualizar Perfil' : 'Salvar Cadastro'}
           </Button>
         </div>
