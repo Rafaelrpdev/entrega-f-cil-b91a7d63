@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,18 +8,30 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
-import { GoogleMap, useJsApiLoader, MarkerF } from '@react-google-maps/api';
+import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
+import L from 'leaflet';
+
+// Leaflet icon fix for Vite
+import 'leaflet/dist/leaflet.css';
+const DefaultIcon = L.icon({
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+});
+L.Marker.prototype.options.icon = DefaultIcon;
+
+function ChangeView({ center }: { center: [number, number] }) {
+  const map = useMap();
+  map.setView(center, 16);
+  return null;
+}
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onComplete: () => void;
 }
-
-const mapContainerStyle = {
-  width: '100%',
-  height: '100%'
-};
 
 export default function CustomerRegistration({ open, onOpenChange, onComplete }: Props) {
   const { user } = useAuth();
@@ -37,15 +49,6 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
   const [isEditMode, setIsEditMode] = useState(false);
   const [isGpsFixed, setIsGpsFixed] = useState(false);
   const queryClient = useQueryClient();
-
-  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
-  
-  const { isLoaded, loadError } = useJsApiLoader({
-    googleMapsApiKey: apiKey,
-    libraries: ['places'],
-    language: 'pt-BR',
-    region: 'BR'
-  });
 
   // Load existing data
   useEffect(() => {
@@ -92,21 +95,24 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
     }
   }, [open, user]);
 
-  // Google Maps Search (Geocoding)
-  const geocodeAddress = useCallback(() => {
-    if (!isLoaded || isGpsFixed || !address) return;
+  // Photon Search (Alternative to Nominatim/Google)
+  const geocodeAddress = useCallback(async () => {
+    if (isGpsFixed || !address || !city) return;
 
-    const geocoder = new google.maps.Geocoder();
-    const fullSearch = `${address}, ${neighborhood}, ${city}, ${state}, Brasil`;
-
-    geocoder.geocode({ address: fullSearch }, (results, status) => {
-      if (status === 'OK' && results && results[0]) {
-        const location = results[0].geometry.location;
-        setLat(location.lat());
-        setLng(location.lng());
+    const query = encodeURIComponent(`${address}, ${neighborhood}, ${city}, ${state}`);
+    try {
+      const res = await fetch(`https://photon.komoot.io/api/?q=${query}&limit=1&lang=pt`);
+      const data = await res.json();
+      
+      if (data.features && data.features.length > 0) {
+        const [lon, latCoord] = data.features[0].geometry.coordinates;
+        setLat(latCoord);
+        setLng(lon);
       }
-    });
-  }, [isLoaded, isGpsFixed, address, neighborhood, city, state]);
+    } catch (err) {
+      console.error("Geocoding error:", err);
+    }
+  }, [isGpsFixed, address, neighborhood, city, state]);
 
   // Debounce search
   useEffect(() => {
@@ -128,18 +134,17 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
         setLng(longitude);
         setIsGpsFixed(true);
         
-        if (isLoaded) {
-          const geocoder = new google.maps.Geocoder();
-          geocoder.geocode({ location: { lat: latitude, lng: longitude } }, (results, status) => {
-            if (status === 'OK' && results && results[0]) {
-              const addr = results[0].address_components;
-              const cityName = addr.find(c => c.types.includes('locality'))?.long_name;
-              const stateName = addr.find(c => c.types.includes('administrative_area_level_1'))?.short_name;
-              if (cityName) setCity(cityName);
-              if (stateName) setState(stateName);
-            }
-          });
-        }
+        try {
+          // Reverse geocoding (Photon doesn't support reverse well, using Nominatim for reverse is fine as it's free)
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+          const data = await res.json();
+          if (data && data.address) {
+            if (data.address.city || data.address.town || data.address.village) 
+              setCity(data.address.city || data.address.town || data.address.village);
+            if (data.address.state) setState(data.address.state);
+          }
+        } catch (e) {}
+
         setGpsLoading(false);
         toast.success('Localização capturada via GPS');
       },
@@ -201,7 +206,7 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="h-[90vh] rounded-t-3xl border-t-0 p-0 overflow-hidden">
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-muted rounded-full z-10" />
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-muted rounded-full z-[1001]" />
         
         <SheetHeader className="p-6 pt-8 bg-background">
           <SheetTitle className="text-2xl font-bold flex items-center gap-2">
@@ -253,25 +258,22 @@ export default function CustomerRegistration({ open, onOpenChange, onComplete }:
                 {isGpsFixed && <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold">🎯 FIXADO</span>}
               </div>
               
-              <div className="aspect-video lg:aspect-auto lg:h-[220px] rounded-3xl overflow-hidden border border-border bg-muted/30 relative group">
-                {!apiKey ? (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center space-y-2">
-                    <MapPin className="w-8 h-8 text-muted-foreground/30" />
-                    <p className="text-xs text-muted-foreground font-medium">Chave da Google API não encontrada.<br/>O mapa operará em modo demonstração.</p>
-                  </div>
-                ) : !isLoaded ? (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                  </div>
-                ) : lat && lng ? (
-                  <GoogleMap
-                    mapContainerStyle={mapContainerStyle}
-                    center={{ lat, lng }}
-                    zoom={17}
-                    options={{ disableDefaultUI: true, gestureHandling: 'greedy' }}
+              <div className="aspect-video lg:aspect-auto lg:h-[220px] rounded-3xl overflow-hidden border border-border bg-muted/30 relative group z-0">
+                {lat && lng ? (
+                  <MapContainer 
+                    center={[lat, lng]} 
+                    zoom={16} 
+                    style={{ width: '100%', height: '100%' }}
+                    zoomControl={false}
+                    dragging={false}
+                    touchZoom={false}
+                    scrollWheelZoom={false}
+                    doubleClickZoom={false}
                   >
-                    <MarkerF position={{ lat, lng }} animation={google.maps.Animation.DROP} />
-                  </GoogleMap>
+                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                    <Marker position={[lat, lng]} />
+                    <ChangeView center={[lat, lng]} />
+                  </MapContainer>
                 ) : (
                   <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center space-y-2">
                     <MapPin className="w-8 h-8 text-muted-foreground/20" />
