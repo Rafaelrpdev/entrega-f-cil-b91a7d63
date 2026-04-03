@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DollarSign, TrendingUp, Package, ShoppingBag } from 'lucide-react';
 
-type FinanceOrderItem = { quantity: number; total_price: number; product_id: string; products: { name: string; cost_price: number } };
+type FinanceOrderItem = { quantity: number; total_price: number; product_id: string; products: { name: string; cost_price: number } | null };
 type FinanceOrder = { id: string; status: string; total: number; order_items: FinanceOrderItem[] };
 type FinanceProduct = { id: string; name: string; sale_price: number; cost_price: number };
 
@@ -11,7 +11,7 @@ export default function AdminFinance() {
   const { data: orders = [] } = useQuery({
     queryKey: ['admin-orders'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('orders').select('*, order_items(*, products(cost_price))');
+      const { data, error } = await supabase.from('orders').select('*, order_items(*, products(name, cost_price))');
       if (error) throw error;
       return data;
     },
