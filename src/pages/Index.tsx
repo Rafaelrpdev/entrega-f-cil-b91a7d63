@@ -159,7 +159,7 @@ const Index = () => {
             className="flex flex-col items-center gap-2 p-4 rounded-xl bg-accent/50 hover:bg-accent transition-colors"
           >
             <Package className="w-6 h-6 text-accent-foreground" />
-            <span className="text-xs font-medium text-foreground">Meus Pedidos</span>
+            <span className="text-xs font-medium text-foreground">Pedidos</span>
           </button>
           <button
             onClick={() => {
