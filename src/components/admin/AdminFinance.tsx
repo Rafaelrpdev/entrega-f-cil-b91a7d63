@@ -11,7 +11,7 @@ export default function AdminFinance() {
   const { data: orders = [] } = useQuery({
     queryKey: ['admin-orders'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('orders').select('*, order_items(*, products(cost_price))');
+      const { data, error } = await supabase.from('orders').select('*, order_items(*, products(name, cost_price))');
       if (error) throw error;
       return data;
     },
