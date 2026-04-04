@@ -1,10 +1,11 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Package, Clock, CheckCircle, Truck, XCircle, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 
 const statusConfig: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
   pending: { label: 'Pendente', icon: <Clock className="w-4 h-4" />, color: 'text-yellow-600 bg-yellow-100' },
@@ -17,6 +18,7 @@ const statusConfig: Record<string, { label: string; icon: React.ReactNode; color
 export default function MeusPedidos() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!loading && !user) navigate('/');
@@ -43,6 +45,23 @@ export default function MeusPedidos() {
       return data;
     },
     enabled: !!customer,
+  });
+
+  const confirmDelivery = useMutation({
+    mutationFn: async (orderId: string) => {
+      const { error } = await supabase
+        .from('orders')
+        .update({ status: 'delivered' })
+        .eq('id', orderId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-orders'] });
+      toast.success('Pedido marcado como entregue!');
+    },
+    onError: () => {
+      toast.error('Erro ao confirmar entrega.');
+    },
   });
 
   const formatDate = (dateStr: string) => {
@@ -82,6 +101,7 @@ export default function MeusPedidos() {
         ) : (
           orders.map((order) => {
             const status = statusConfig[order.status] || statusConfig.pending;
+            const canConfirm = order.status !== 'delivered' && order.status !== 'cancelled';
             return (
               <div key={order.id} className="bg-card border border-border rounded-xl p-4 space-y-3">
                 <div className="flex items-center justify-between">
@@ -118,6 +138,19 @@ export default function MeusPedidos() {
                     R$ {Number(order.total).toFixed(2).replace('.', ',')}
                   </span>
                 </div>
+
+                {canConfirm && (
+                  <Button
+                    size="sm"
+                    className="w-full"
+                    variant="outline"
+                    disabled={confirmDelivery.isPending}
+                    onClick={() => confirmDelivery.mutate(order.id)}
+                  >
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                    Confirmar Entrega
+                  </Button>
+                )}
               </div>
             );
           })
