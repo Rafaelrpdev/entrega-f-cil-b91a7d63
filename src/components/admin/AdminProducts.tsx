@@ -8,13 +8,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Plus, Pencil, Trash2, Upload, ImageIcon, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Upload, ImageIcon, Loader2, Package } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Product = Tables<'products'>;
 
-const emptyProduct = { name: '', category: 'gas', description: '', cost_price: 0, sale_price: 0, image_url: '', active: true };
+const emptyProduct = { name: '', category: 'gas', description: '', cost_price: 0, sale_price: 0, image_url: '', active: true, stock: 0 };
 
 export default function AdminProducts() {
   const qc = useQueryClient();
@@ -68,6 +68,7 @@ export default function AdminProducts() {
         description: form.description || null,
         cost_price: Number(form.cost_price),
         sale_price: Number(form.sale_price),
+        stock: Number(form.stock),
         image_url: form.image_url || null,
         active: form.active,
       };
@@ -103,7 +104,16 @@ export default function AdminProducts() {
   const openNew = () => { setEditing(null); setForm(emptyProduct); setDialogOpen(true); };
   const openEdit = (p: Product) => {
     setEditing(p);
-    setForm({ name: p.name, category: p.category, description: p.description || '', cost_price: Number(p.cost_price), sale_price: Number(p.sale_price), image_url: p.image_url || '', active: p.active });
+    setForm({ 
+      name: p.name, 
+      category: p.category, 
+      description: p.description || '', 
+      cost_price: Number(p.cost_price), 
+      sale_price: Number(p.sale_price), 
+      stock: (p as any).stock || 0,
+      image_url: p.image_url || '', 
+      active: p.active 
+    });
     setDialogOpen(true);
   };
 
@@ -123,11 +133,15 @@ export default function AdminProducts() {
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-sm text-foreground truncate">{p.name}</span>
                     {!p.active && <span className="text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded">Inativo</span>}
+                    <div className="flex items-center gap-1 text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-bold">
+                      <Package className="w-3 h-3" />
+                      <span>{ (p as any).stock || 0 } un.</span>
+                    </div>
                   </div>
-                  <div className="flex gap-3 text-xs text-muted-foreground mt-0.5">
+                  <div className="flex gap-3 text-[10px] text-muted-foreground mt-1 uppercase font-semibold">
                     <span>Custo: R$ {Number(p.cost_price).toFixed(2)}</span>
                     <span>Venda: R$ {Number(p.sale_price).toFixed(2)}</span>
-                    <span className="text-success font-medium">Margem: R$ {(Number(p.sale_price) - Number(p.cost_price)).toFixed(2)}</span>
+                    <span className="text-success">Margem: R$ {(Number(p.sale_price) - Number(p.cost_price)).toFixed(2)}</span>
                   </div>
                 </div>
                 <div className="flex gap-1">
@@ -156,9 +170,10 @@ export default function AdminProducts() {
               </Select>
             </div>
             <div><Label>Descrição</Label><Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} /></div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><Label>Preço de Custo</Label><Input type="number" step="0.01" value={form.cost_price} onChange={e => setForm(f => ({ ...f, cost_price: parseFloat(e.target.value) || 0 }))} /></div>
-              <div><Label>Preço de Venda</Label><Input type="number" step="0.01" value={form.sale_price} onChange={e => setForm(f => ({ ...f, sale_price: parseFloat(e.target.value) || 0 }))} /></div>
+            <div className="grid grid-cols-3 gap-3">
+              <div><Label>Custo</Label><Input type="number" step="0.01" value={form.cost_price} onChange={e => setForm(f => ({ ...f, cost_price: parseFloat(e.target.value) || 0 }))} /></div>
+              <div><Label>Venda</Label><Input type="number" step="0.01" value={form.sale_price} onChange={e => setForm(f => ({ ...f, sale_price: parseFloat(e.target.value) || 0 }))} /></div>
+              <div><Label>Estoque</Label><Input type="number" value={form.stock} onChange={e => setForm(f => ({ ...f, stock: parseInt(e.target.value) || 0 }))} /></div>
             </div>
             {/* Image upload area */}
             <div>

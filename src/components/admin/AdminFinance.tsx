@@ -1,19 +1,27 @@
 import { useQuery } from '@tanstack/react-query';
+import { useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { DollarSign, TrendingUp, Package, ShoppingBag } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { DollarSign, TrendingUp, Package, ShoppingBag, Calendar as CalendarIcon } from 'lucide-react';
+import { subDays, startOfDay, endOfDay, startOfMonth, isWithinInterval, parseISO } from 'date-fns';
 
 type FinanceOrderItem = { quantity: number; total_price: number; product_id: string; products: { name: string; cost_price: number } | null };
-type FinanceOrder = { id: string; status: string; total: number; order_items: FinanceOrderItem[] };
+type FinanceOrder = { id: string; status: string; total: number; created_at: string; order_items: FinanceOrderItem[] };
 type FinanceProduct = { id: string; name: string; sale_price: number; cost_price: number };
 
 export default function AdminFinance() {
-  const { data: orders = [] } = useQuery({
+  const [period, setPeriod] = useState<string>('all');
+  const [customStart, setCustomStart] = useState<string>('');
+  const [customEnd, setCustomEnd] = useState<string>('');
+
+  const { data: allOrders = [] } = useQuery({
     queryKey: ['admin-orders'],
     queryFn: async () => {
       const { data, error } = await supabase.from('orders').select('*, order_items(*, products(name, cost_price))');
       if (error) throw error;
-      return data;
+      return data as FinanceOrder[];
     },
   });
 
@@ -22,12 +30,38 @@ export default function AdminFinance() {
     queryFn: async () => {
       const { data, error } = await supabase.from('products').select('*');
       if (error) throw error;
-      return data;
+      return data as FinanceProduct[];
     },
   });
 
-  const delivered = orders.filter((o: FinanceOrder) => o.status === 'delivered');
-  const pending = orders.filter((o: FinanceOrder) => o.status === 'pending');
+  const filteredOrders = useMemo(() => {
+    if (period === 'all') return allOrders;
+
+    const now = new Date();
+    let start: Date;
+    let end: Date = endOfDay(now);
+
+    if (period === 'today') {
+      start = startOfDay(now);
+    } else if (period === '7days') {
+      start = startOfDay(subDays(now, 7));
+    } else if (period === 'month') {
+      start = startOfMonth(now);
+    } else if (period === 'custom' && customStart && customEnd) {
+      start = startOfDay(parseISO(customStart));
+      end = endOfDay(parseISO(customEnd));
+    } else {
+      return allOrders;
+    }
+
+    return allOrders.filter(o => {
+      const orderDate = parseISO(o.created_at);
+      return isWithinInterval(orderDate, { start, end });
+    });
+  }, [allOrders, period, customStart, customEnd]);
+
+  const delivered = filteredOrders.filter((o: FinanceOrder) => o.status === 'delivered');
+  const pending = filteredOrders.filter((o: FinanceOrder) => o.status === 'pending');
 
   const totalRevenue = delivered.reduce((sum: number, o: FinanceOrder) => sum + Number(o.total), 0);
   const totalCost = delivered.reduce((sum: number, o: FinanceOrder) => {
@@ -42,7 +76,6 @@ export default function AdminFinance() {
     { label: 'Pedidos Pendentes', value: pending.length, icon: Package, color: 'text-warning' },
   ];
 
-  // Top products by quantity sold
   const productSales: Record<string, { name: string; qty: number; revenue: number }> = {};
   delivered.forEach((o: FinanceOrder) => {
     (o.order_items || []).forEach((item: FinanceOrderItem) => {
@@ -56,7 +89,50 @@ export default function AdminFinance() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-base font-semibold text-foreground">Controle Financeiro</h2>
+      <div className="flex flex-col gap-3">
+        <h2 className="text-base font-semibold text-foreground">Controle Financeiro</h2>
+        
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <CalendarIcon className="w-4 h-4 text-muted-foreground" />
+            <Select value={period} onValueChange={setPeriod}>
+              <SelectTrigger className="w-full sm:w-[200px]">
+                <SelectValue placeholder="Selecionar período" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tudo</SelectItem>
+                <SelectItem value="today">Hoje</SelectItem>
+                <SelectItem value="7days">Últimos 7 dias</SelectItem>
+                <SelectItem value="month">Este Mês</SelectItem>
+                <SelectItem value="custom">Personalizado</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {period === 'custom' && (
+            <div className="grid grid-cols-2 gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase font-bold text-muted-foreground ml-1">Início</label>
+                <Input 
+                  type="date" 
+                  value={customStart} 
+                  onChange={(e) => setCustomStart(e.target.value)}
+                  className="h-9 text-sm"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase font-bold text-muted-foreground ml-1">Fim</label>
+                <Input 
+                  type="date" 
+                  value={customEnd} 
+                  onChange={(e) => setCustomEnd(e.target.value)}
+                  className="h-9 text-sm"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
 
       <div className="grid grid-cols-2 gap-3">
         {stats.map(s => (
@@ -75,10 +151,10 @@ export default function AdminFinance() {
       </div>
 
       <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm">Produtos Mais Vendidos</CardTitle></CardHeader>
+        <CardHeader className="pb-2"><CardTitle className="text-sm">Produtos Mais Vendidos no Período</CardTitle></CardHeader>
         <CardContent className="p-3 pt-0">
           {topProducts.length === 0 ? (
-            <p className="text-xs text-muted-foreground">Nenhuma venda registrada ainda.</p>
+            <p className="text-xs text-muted-foreground">Nenhuma venda registrada no período selecionado.</p>
           ) : (
             <div className="space-y-2">
               {topProducts.map((p, i) => (
@@ -96,7 +172,7 @@ export default function AdminFinance() {
       </Card>
 
       <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm">Resumo de Margem</CardTitle></CardHeader>
+        <CardHeader className="pb-2"><CardTitle className="text-sm">Resumo de Margem (Catálogo)</CardTitle></CardHeader>
         <CardContent className="p-3 pt-0">
           {products.length === 0 ? (
             <p className="text-xs text-muted-foreground">Nenhum produto cadastrado.</p>
