@@ -159,7 +159,6 @@ export default function MeusPedidos() {
     </div>
   );
 }
-  const { user, loading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
