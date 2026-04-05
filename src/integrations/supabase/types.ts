@@ -252,6 +252,7 @@ export type Database = {
           image_url: string | null
           name: string
           sale_price: number
+          stock: number
           updated_at: string
         }
         Insert: {
@@ -264,6 +265,7 @@ export type Database = {
           image_url?: string | null
           name: string
           sale_price: number
+          stock?: number
           updated_at?: string
         }
         Update: {
@@ -276,9 +278,58 @@ export type Database = {
           image_url?: string | null
           name?: string
           sale_price?: number
+          stock?: number
           updated_at?: string
         }
         Relationships: []
+      }
+      stock_movements: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          order_id: string | null
+          product_id: string
+          quantity: number
+          reason: string
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          order_id?: string | null
+          product_id: string
+          quantity: number
+          reason?: string
+          type: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          order_id?: string | null
+          product_id?: string
+          quantity?: number
+          reason?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_movements_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movements_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       store_settings: {
         Row: {
@@ -336,6 +387,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_stock_entry: {
+        Args: { _product_id: string; _quantity: number; _reason?: string }
+        Returns: undefined
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
