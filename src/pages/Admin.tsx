@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Package, ShoppingBag, BarChart3, Image, Settings, Tag, Users, Warehouse } from 'lucide-react';
+import { ArrowLeft, Package, ShoppingBag, BarChart3, Image, Settings, Tag, Users, Warehouse, HeartPulse } from 'lucide-react';
 import AdminCustomers from '@/components/admin/AdminCustomers';
 import AdminProducts from '@/components/admin/AdminProducts';
 import AdminStock from '@/components/admin/AdminStock';
@@ -56,7 +56,7 @@ export default function Admin() {
             <TabsTrigger value="stock" className="gap-1.5"><Warehouse className="w-4 h-4" /> Estoque</TabsTrigger>
             <TabsTrigger value="banners" className="gap-1.5"><Image className="w-4 h-4" /> Banners</TabsTrigger>
             <TabsTrigger value="coupons" className="gap-1.5"><Tag className="w-4 h-4" /> Cupons</TabsTrigger>
-            <TabsTrigger value="finance" className="gap-1.5"><BarChart3 className="w-4 h-4" /> Financeiro</TabsTrigger>
+            <TabsTrigger value="finance" className="gap-1.5"><HeartPulse className="w-4 h-4" /> Saúde Fin.</TabsTrigger>
             <TabsTrigger value="settings" className="gap-1.5"><Settings className="w-4 h-4" /> Empresa</TabsTrigger>
           </TabsList>
           <TabsContent value="customers"><AdminCustomers /></TabsContent>

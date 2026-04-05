@@ -14,6 +14,130 @@ export type Database = {
   }
   public: {
     Tables: {
+      financial_revenues: {
+        Row: {
+          id: string
+          created_at: string
+          data: string
+          descricao: string
+          valor: number
+          categoria: string
+          produto: string | null
+          quantidade: number | null
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          data?: string
+          descricao: string
+          valor: number
+          categoria?: string
+          produto?: string | null
+          quantidade?: number | null
+        }
+        Update: {
+          id?: string
+          created_at?: string
+          data?: string
+          descricao?: string
+          valor?: number
+          categoria?: string
+          produto?: string | null
+          quantidade?: number | null
+        }
+        Relationships: []
+      }
+      financial_expenses: {
+        Row: {
+          id: string
+          created_at: string
+          data: string
+          descricao: string
+          valor: number
+          categoria: string
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          data?: string
+          descricao: string
+          valor: number
+          categoria?: string
+        }
+        Update: {
+          id?: string
+          created_at?: string
+          data?: string
+          descricao?: string
+          valor?: number
+          categoria?: string
+        }
+        Relationships: []
+      }
+      financial_debts: {
+        Row: {
+          id: string
+          created_at: string
+          credor: string
+          descricao: string | null
+          valor_total: number
+          valor_pago: number
+          valor_restante: number
+          data_vencimento: string | null
+          quitada: boolean
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          credor: string
+          descricao?: string | null
+          valor_total: number
+          valor_pago?: number
+          data_vencimento?: string | null
+          quitada?: boolean
+        }
+        Update: {
+          id?: string
+          created_at?: string
+          credor?: string
+          descricao?: string | null
+          valor_total?: number
+          valor_pago?: number
+          data_vencimento?: string | null
+          quitada?: boolean
+        }
+        Relationships: []
+      }
+      financial_goals: {
+        Row: {
+          id: string
+          created_at: string
+          nome_meta: string
+          tipo: string
+          valor_meta: number
+          periodo: string
+          ativa: boolean
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          nome_meta: string
+          tipo?: string
+          valor_meta: number
+          periodo?: string
+          ativa?: boolean
+        }
+        Update: {
+          id?: string
+          created_at?: string
+          nome_meta?: string
+          tipo?: string
+          valor_meta?: number
+          periodo?: string
+          ativa?: boolean
+        }
+        Relationships: []
+      }
       banners: {
         Row: {
           active: boolean
