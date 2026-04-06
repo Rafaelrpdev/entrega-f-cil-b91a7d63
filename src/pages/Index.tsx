@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+
 import {
   ShoppingCart,
   User,
@@ -30,6 +31,8 @@ import CustomerRegistration from "@/components/CustomerRegistration";
 
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
+
+import { toast } from "sonner";
 
 import type { Product } from "@/types/product";
 
@@ -71,73 +74,80 @@ const Index = () => {
   const queryClient =
     useQueryClient();
 
+  // 🔐 ADMIN
 
-
-  // 🔐 Verifica se é admin (seguro)
-
-  const { data: isAdmin } = useQuery({
-
-    queryKey: ["is-admin", user?.id],
-
-    queryFn: async () => {
-
-      if (!user) return false;
-
-      try {
-
-        const { data, error } =
-          await supabase.rpc(
-            "has_role",
-            {
-              _user_id: user.id,
-              _role: "admin",
-            }
-          );
-
-        if (error) return false;
-
-        return !!data;
-
-      }
-      catch {
-
-        return false;
-
-      }
-
-    },
-
-    enabled: !!user,
-
-  });
-
-
-
-  // 📦 Produtos
-
-  const { data: dbProducts } =
+  const { data: isAdmin } =
     useQuery({
 
-      queryKey: ["products"],
+      queryKey: ["is-admin", user?.id],
 
       queryFn: async () => {
 
-        const { data, error } =
-          await supabase
-            .from("products")
-            .select("*");
+        if (!user) return false;
 
-        if (error) throw error;
+        try {
 
-        return data;
+          const { data, error } =
+            await supabase.rpc(
+              "has_role",
+              {
+                _user_id: user.id,
+                _role: "admin",
+              }
+            );
+
+          if (error) return false;
+
+          return !!data;
+
+        }
+        catch {
+
+          return false;
+
+        }
 
       },
 
+      enabled: !!user,
+
     });
 
+  // 📦 PRODUTOS
 
+  const {
+    data: dbProducts,
+    isLoading: productsLoading,
+  } = useQuery({
 
-  // 👤 Cliente
+    queryKey: ["products"],
+
+    staleTime: 1000 * 60 * 5,
+
+    queryFn: async () => {
+
+      const { data, error } =
+        await supabase
+          .from("products")
+          .select("*");
+
+      if (error) {
+
+        toast.error(
+          "Erro ao carregar produtos"
+        );
+
+        throw error;
+
+      }
+
+      return data;
+
+    },
+
+  });
+
+  // 👤 CLIENTE
 
   const { data: customer } =
     useQuery({
@@ -148,12 +158,22 @@ const Index = () => {
 
         if (!user) return null;
 
-        const { data } =
+        const { data, error } =
           await supabase
             .from("customers")
             .select("*")
             .eq("user_id", user.id)
             .maybeSingle();
+
+        if (error) {
+
+          toast.error(
+            "Erro ao carregar cliente"
+          );
+
+          throw error;
+
+        }
 
         return data;
 
@@ -163,9 +183,7 @@ const Index = () => {
 
     });
 
-
-
-  // 🔔 Abrir cadastro se não tiver perfil
+  // 🔔 Cadastro automático
 
   useEffect(() => {
 
@@ -179,49 +197,61 @@ const Index = () => {
 
     }
 
-  }, [user, customer]);
+  }, [
+    user,
+    customer,
+    registrationOpen,
+  ]);
 
+  const handleRegistrationComplete =
+    () => {
 
+      queryClient.invalidateQueries({
+        queryKey: [
+          "customer",
+          user?.id,
+        ],
+      });
 
-  const handleRegistrationComplete = () => {
+      setRegistrationOpen(false);
 
-    queryClient.invalidateQueries({
-      queryKey: ["customer", user?.id],
-    });
+    };
 
-    setRegistrationOpen(false);
-
-  };
-
-
-
-  // 🛍️ Mapear produtos
+  // 🛍️ Memo produtos
 
   const products: Product[] =
-    (dbProducts || []).map(p => ({
+    useMemo(() => {
 
-      id: p.id,
+      return (
+        dbProducts || []
+      ).map(p => ({
 
-      name: p.name,
+        id: p.id,
 
-      description: p.description || "",
+        name: p.name,
 
-      price: Number(p.sale_price),
+        description:
+          p.description || "",
 
-      image:
-        p.image_url ||
-        categoryImages[p.category] ||
-        gasImg,
+        price:
+          Number(p.sale_price),
 
-      category:
-        p.category as
-          | "gas"
-          | "agua"
-          | "carvao",
+        image:
+          p.image_url ||
+          categoryImages[
+            p.category
+          ] ||
+          gasImg,
 
-    }));
+        category:
+          p.category as
+            | "gas"
+            | "agua"
+            | "carvao",
 
+      }));
 
+    }, [dbProducts]);
 
   return (
 
@@ -249,8 +279,6 @@ const Index = () => {
 
           </div>
 
-
-
           <div className="flex items-center gap-2">
 
             {user ? (
@@ -272,12 +300,8 @@ const Index = () => {
 
                 )}
 
-
-
                 <button
-                  onClick={() =>
-                    signOut()
-                  }
+                  onClick={signOut}
                   className="p-2.5 rounded-xl bg-muted text-muted-foreground"
                 >
 
@@ -302,8 +326,6 @@ const Index = () => {
 
             )}
 
-
-
             {/* 🌙 Tema */}
 
             <button
@@ -325,8 +347,6 @@ const Index = () => {
               <Moon className="absolute w-5 h-5 scale-0 dark:scale-100" />
 
             </button>
-
-
 
             {/* 🛒 Carrinho */}
 
@@ -357,17 +377,13 @@ const Index = () => {
 
       </header>
 
-
-
       {/* MAIN */}
 
       <main className="max-w-2xl mx-auto px-4 py-4 space-y-6 pb-8">
 
         <PromoBanner />
 
-
-
-        {/* 🔧 BOTÕES */}
+        {/* BOTÕES */}
 
         <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">
 
@@ -383,8 +399,6 @@ const Index = () => {
             Comprar
 
           </button>
-
-
 
           <button
             onClick={() => {
@@ -409,8 +423,6 @@ const Index = () => {
 
           </button>
 
-
-
           <button
             onClick={() => {
 
@@ -434,13 +446,14 @@ const Index = () => {
 
           </button>
 
-
-
-          {/* 🚨 CORREÇÃO AQUI */}
+          {/* 📞 SUPORTE REAL */}
 
           <button
             onClick={() =>
-              navigate("/")
+              window.open(
+                "https://wa.me/5599999999999",
+                "_blank"
+              )
             }
             className="flex flex-col items-center gap-2 p-4 rounded-xl bg-muted"
           >
@@ -453,8 +466,6 @@ const Index = () => {
 
         </section>
 
-
-
         {/* 🛍️ PRODUTOS */}
 
         <section>
@@ -465,25 +476,42 @@ const Index = () => {
 
           </h2>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          {productsLoading ? (
 
-            {products.map(product => (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
 
-              <ProductCard
-                key={product.id}
-                product={product}
-                onSelect={setSelectedProduct}
-              />
+              {[1,2,3,4].map(i => (
 
-            ))}
+                <div
+                  key={i}
+                  className="h-40 rounded-xl bg-muted animate-pulse"
+                />
 
-          </div>
+              ))}
+
+            </div>
+
+          ) : (
+
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+
+              {products.map(product => (
+
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  onSelect={setSelectedProduct}
+                />
+
+              ))}
+
+            </div>
+
+          )}
 
         </section>
 
       </main>
-
-
 
       {/* MODAIS */}
 
@@ -501,8 +529,6 @@ const Index = () => {
         )}
 
       </AnimatePresence>
-
-
 
       <CartSheet
         open={cartOpen}
