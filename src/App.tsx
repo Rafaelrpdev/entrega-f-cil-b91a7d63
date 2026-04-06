@@ -35,53 +35,75 @@ const LoadingSpinner = () => (
 
 // 🔒 Proteção de rotas autenticadas
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+
   const { user, loading } = useAuth();
 
-  // Enquanto carrega auth
   if (loading) {
     return <LoadingSpinner />;
   }
 
-  // Se não estiver logado
   if (!user) {
     return <Navigate to="/login" replace />;
   }
 
   return <>{children}</>;
+
 };
 
 
-// 🧠 Proteção para impedir acesso ao login quando já logado
+// 🔓 Rotas públicas (login)
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
+
   const { user, loading } = useAuth();
 
   if (loading) {
     return <LoadingSpinner />;
   }
 
-  // Se já logado → manda para home
   if (user) {
     return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;
+
 };
 
 
 // 🚀 APP PRINCIPAL
 const App = () => {
+
   return (
+
     <ThemeProvider defaultTheme="dark" attribute="class">
+
       <QueryClientProvider client={queryClient}>
+
         <TooltipProvider>
+
           <AuthProvider>
+
             <CartProvider>
+
               <BrowserRouter>
 
                 <Toaster />
                 <Sonner />
 
                 <Routes>
+
+                  {/* 🔁 REDIRECIONAMENTOS IMPORTANTES */}
+
+                  <Route
+                    path="/home"
+                    element={<Navigate to="/" replace />}
+                  />
+
+                  <Route
+                    path="/auth"
+                    element={<Navigate to="/login" replace />}
+                  />
+
+
 
                   {/* 🔓 Login */}
                   <Route
@@ -93,6 +115,7 @@ const App = () => {
                     }
                   />
 
+
                   {/* 🏠 Home */}
                   <Route
                     path="/"
@@ -102,6 +125,7 @@ const App = () => {
                       </ProtectedRoute>
                     }
                   />
+
 
                   {/* 📦 Meus Pedidos */}
                   <Route
@@ -113,6 +137,7 @@ const App = () => {
                     }
                   />
 
+
                   {/* ⚙️ Admin */}
                   <Route
                     path="/admin"
@@ -123,6 +148,7 @@ const App = () => {
                     }
                   />
 
+
                   {/* ❌ Página não encontrada */}
                   <Route
                     path="*"
@@ -132,12 +158,19 @@ const App = () => {
                 </Routes>
 
               </BrowserRouter>
+
             </CartProvider>
+
           </AuthProvider>
+
         </TooltipProvider>
+
       </QueryClientProvider>
+
     </ThemeProvider>
+
   );
+
 };
 
 export default App;
