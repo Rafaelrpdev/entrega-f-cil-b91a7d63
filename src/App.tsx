@@ -1,176 +1,62 @@
-import React from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import {
-  BrowserRouter,
-  Route,
-  Routes,
-  Navigate,
-} from "react-router-dom";
-
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { Toaster } from "@/components/ui/toaster";
-import { TooltipProvider } from "@/components/ui/tooltip";
-
-import { CartProvider } from "@/contexts/CartContext";
-import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-
-import { ThemeProvider } from "@/components/ThemeProvider";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import Index from "./pages/Index";
-import Admin from "./pages/Admin";
-import MeusPedidos from "./pages/MeusPedidos";
-import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
+import Admin from "./pages/Admin";
 
-const queryClient = new QueryClient();
+import Support from "./pages/Support";
+import Orders from "./pages/Orders";
 
-
-// 🔄 Spinner de carregamento
-const LoadingSpinner = () => (
-  <div className="flex items-center justify-center h-screen">
-    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-  </div>
-);
-
-
-// 🔒 Proteção de rotas autenticadas
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-
-  const { user, loading } = useAuth();
-
-  if (loading) {
-    return <LoadingSpinner />;
-  }
-
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-
-  return <>{children}</>;
-
-};
-
-
-// 🔓 Rotas públicas (login)
-const PublicRoute = ({ children }: { children: React.ReactNode }) => {
-
-  const { user, loading } = useAuth();
-
-  if (loading) {
-    return <LoadingSpinner />;
-  }
-
-  if (user) {
-    return <Navigate to="/" replace />;
-  }
-
-  return <>{children}</>;
-
-};
-
-
-// 🚀 APP PRINCIPAL
-const App = () => {
+function App() {
 
   return (
 
-    <ThemeProvider defaultTheme="dark" attribute="class">
+    <BrowserRouter>
 
-      <QueryClientProvider client={queryClient}>
+      <Routes>
 
-        <TooltipProvider>
+        {/* 🏠 Página principal */}
+        <Route
+          path="/"
+          element={<Index />}
+        />
 
-          <AuthProvider>
+        {/* 🔐 Login */}
+        <Route
+          path="/login"
+          element={<Login />}
+        />
 
-            <CartProvider>
+        {/* 🛠️ Admin */}
+        <Route
+          path="/admin"
+          element={<Admin />}
+        />
 
-              <BrowserRouter>
+        {/* 📦 Meus pedidos */}
+        <Route
+          path="/meus-pedidos"
+          element={<Orders />}
+        />
 
-                <Toaster />
-                <Sonner />
+        {/* 💬 Suporte */}
+        <Route
+          path="/suporte"
+          element={<Support />}
+        />
 
-                <Routes>
+        {/* 🚨 Fallback */}
+        <Route
+          path="*"
+          element={<Index />}
+        />
 
-                  {/* 🔁 REDIRECIONAMENTOS IMPORTANTES */}
+      </Routes>
 
-                  <Route
-                    path="/home"
-                    element={<Navigate to="/" replace />}
-                  />
-
-                  <Route
-                    path="/auth"
-                    element={<Navigate to="/login" replace />}
-                  />
-
-
-
-                  {/* 🔓 Login */}
-                  <Route
-                    path="/login"
-                    element={
-                      <PublicRoute>
-                        <Login />
-                      </PublicRoute>
-                    }
-                  />
-
-
-                  {/* 🏠 Home */}
-                  <Route
-                    path="/"
-                    element={
-                      <ProtectedRoute>
-                        <Index />
-                      </ProtectedRoute>
-                    }
-                  />
-
-
-                  {/* 📦 Meus Pedidos */}
-                  <Route
-                    path="/meus-pedidos"
-                    element={
-                      <ProtectedRoute>
-                        <MeusPedidos />
-                      </ProtectedRoute>
-                    }
-                  />
-
-
-                  {/* ⚙️ Admin */}
-                  <Route
-                    path="/admin"
-                    element={
-                      <ProtectedRoute>
-                        <Admin />
-                      </ProtectedRoute>
-                    }
-                  />
-
-
-                  {/* ❌ Página não encontrada */}
-                  <Route
-                    path="*"
-                    element={<NotFound />}
-                  />
-
-                </Routes>
-
-              </BrowserRouter>
-
-            </CartProvider>
-
-          </AuthProvider>
-
-        </TooltipProvider>
-
-      </QueryClientProvider>
-
-    </ThemeProvider>
+    </BrowserRouter>
 
   );
 
-};
+}
 
 export default App;
