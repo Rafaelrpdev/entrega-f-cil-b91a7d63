@@ -29,15 +29,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-const AdminRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, loading } = useAuth();
-  if (loading) return <LoadingSpinner />;
-  if (!user || user.role !== "admin") return <Navigate to="/" replace />;
-  return <>{children}</>;
-};
-
 const App = () => (
-<ThemeProvider defaultTheme="dark" attribute="class">
+  <ThemeProvider defaultTheme="dark" attribute="class">
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <AuthProvider>
@@ -49,7 +42,7 @@ const App = () => (
                 <Route path="/" element={<Login />} />
                 <Route path="/home" element={<Index />} />
                 <Route path="/meus-pedidos" element={<ProtectedRoute><MeusPedidos /></ProtectedRoute>} />
-                <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
+                <Route path="/admin" element={<Admin />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </BrowserRouter>
