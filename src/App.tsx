@@ -1,11 +1,17 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
+// 📄 Páginas
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Admin from "./pages/Admin";
-
 import Support from "./pages/Support";
 import Orders from "./pages/Orders";
+
+// 🔐 Contextos (se você usa AuthProvider)
+import { AuthProvider } from "./contexts/AuthContext";
+
+// 🔔 Toast (se você usa sonner)
+import { Toaster } from "sonner";
 
 function App() {
 
@@ -13,45 +19,64 @@ function App() {
 
     <BrowserRouter>
 
-      <Routes>
+      {/* 🔐 Provider de autenticação */}
+      <AuthProvider>
 
-        {/* 🏠 Página principal */}
-        <Route
-          path="/"
-          element={<Index />}
-        />
+        {/* 🔔 Toasts globais */}
+        <Toaster richColors position="top-center" />
 
-        {/* 🔐 Login */}
-        <Route
-          path="/login"
-          element={<Login />}
-        />
+        <Routes>
 
-        {/* 🛠️ Admin */}
-        <Route
-          path="/admin"
-          element={<Admin />}
-        />
+          {/* 🏠 Página principal */}
+          <Route
+            path="/"
+            element={<Index />}
+          />
 
-        {/* 📦 Meus pedidos */}
-        <Route
-          path="/meus-pedidos"
-          element={<Orders />}
-        />
+          {/* 🔐 Login */}
+          <Route
+            path="/login"
+            element={<Login />}
+          />
 
-        {/* 💬 Suporte */}
-        <Route
-          path="/suporte"
-          element={<Support />}
-        />
+          {/* 🛠️ Admin */}
+          <Route
+            path="/admin"
+            element={<Admin />}
+          />
 
-        {/* 🚨 Fallback */}
-        <Route
-          path="*"
-          element={<Index />}
-        />
+          {/* 📦 Meus pedidos */}
+          <Route
+            path="/meus-pedidos"
+            element={<Orders />}
+          />
 
-      </Routes>
+          {/* 💬 Suporte */}
+          <Route
+            path="/suporte"
+            element={<Support />}
+          />
+
+          {/* 🚨 Redireciona rotas antigas */}
+          <Route
+            path="/home"
+            element={<Navigate to="/" replace />}
+          />
+
+          <Route
+            path="/auth"
+            element={<Navigate to="/login" replace />}
+          />
+
+          {/* 🚨 Fallback universal */}
+          <Route
+            path="*"
+            element={<Navigate to="/" replace />}
+          />
+
+        </Routes>
+
+      </AuthProvider>
 
     </BrowserRouter>
 
