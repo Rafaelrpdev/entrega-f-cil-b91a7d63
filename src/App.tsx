@@ -1,17 +1,11 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 
-// 📄 Páginas
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Admin from "./pages/Admin";
+
 import Support from "./pages/Support";
-import Orders from "./pages/Orders";
-
-// 🔐 Contextos (se você usa AuthProvider)
-import { AuthProvider } from "./contexts/AuthContext";
-
-// 🔔 Toast (se você usa sonner)
-import { Toaster } from "sonner";
+import MeusPedidos from "./pages/MeusPedidos";
 
 function App() {
 
@@ -19,64 +13,54 @@ function App() {
 
     <BrowserRouter>
 
-      {/* 🔐 Provider de autenticação */}
-      <AuthProvider>
+      <Routes>
 
-        {/* 🔔 Toasts globais */}
-        <Toaster richColors position="top-center" />
+        {/* 🏠 Página principal */}
+        <Route
+          path="/"
+          element={<Index />}
+        />
 
-        <Routes>
+        {/* 🔐 Login */}
+        <Route
+          path="/login"
+          element={<Login />}
+        />
 
-          {/* 🏠 Página principal */}
-          <Route
-            path="/"
-            element={<Index />}
-          />
+        {/* 🛠️ Admin */}
+        <Route
+          path="/admin"
+          element={<Admin />}
+        />
 
-          {/* 🔐 Login */}
-          <Route
-            path="/login"
-            element={<Login />}
-          />
+        {/* 📦 Meus pedidos */}
+        <Route
+          path="/meus-pedidos"
+          element={<MeusPedidos />}
+        />
 
-          {/* 🛠️ Admin */}
-          <Route
-            path="/admin"
-            element={<Admin />}
-          />
+        {/* 💬 Suporte */}
+        <Route
+          path="/suporte"
+          element={<Support />}
+        />
 
-          {/* 📦 Meus pedidos */}
-          <Route
-            path="/meus-pedidos"
-            element={<Orders />}
-          />
+        {/* 🚨 Página não encontrada */}
+        <Route
+          path="*"
+          element={
+            <div className="p-6 text-center">
+              <h1 className="text-xl font-bold">
+                Página não encontrada
+              </h1>
+              <p className="text-muted-foreground">
+                A página que você tentou acessar não existe.
+              </p>
+            </div>
+          }
+        />
 
-          {/* 💬 Suporte */}
-          <Route
-            path="/suporte"
-            element={<Support />}
-          />
-
-          {/* 🚨 Redireciona rotas antigas */}
-          <Route
-            path="/home"
-            element={<Navigate to="/" replace />}
-          />
-
-          <Route
-            path="/auth"
-            element={<Navigate to="/login" replace />}
-          />
-
-          {/* 🚨 Fallback universal */}
-          <Route
-            path="*"
-            element={<Navigate to="/" replace />}
-          />
-
-        </Routes>
-
-      </AuthProvider>
+      </Routes>
 
     </BrowserRouter>
 
