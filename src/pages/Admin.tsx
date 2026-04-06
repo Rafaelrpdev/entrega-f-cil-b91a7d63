@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+
 import { useAuth } from "@/contexts/AuthContext";
+
 import { supabase } from "@/integrations/supabase/client";
 
 import {
@@ -25,6 +26,12 @@ import {
   HeartPulse,
 } from "lucide-react";
 
+import {
+  useQuery,
+} from "@tanstack/react-query";
+
+import { toast } from "sonner";
+
 import AdminCustomers from "@/components/admin/AdminCustomers";
 import AdminProducts from "@/components/admin/AdminProducts";
 import AdminStock from "@/components/admin/AdminStock";
@@ -37,30 +44,27 @@ import AdminFinancialHealth from "@/components/admin/AdminFinancialHealth";
 
 export default function Admin() {
 
-  const { user, loading } = useAuth();
+  const { user, loading } =
+    useAuth();
 
-  const navigate = useNavigate();
+  const navigate =
+    useNavigate();
 
-  const [isAdmin, setIsAdmin] =
-    useState<boolean | null>(null);
+  // 🔐 Verificação segura com React Query
 
+  const {
+    data: isAdmin,
+    isLoading: adminLoading,
+  } = useQuery({
 
+    queryKey: [
+      "is-admin",
+      user?.id,
+    ],
 
-  // 🔐 Verifica se usuário é admin
-  useEffect(() => {
+    queryFn: async () => {
 
-    if (loading) return;
-
-    // Se não estiver logado
-    if (!user) {
-
-      navigate("/");
-
-      return;
-
-    }
-
-    const checkAdmin = async () => {
+      if (!user) return false;
 
       try {
 
@@ -73,31 +77,18 @@ export default function Admin() {
             }
           );
 
-        // 🚨 Se houver erro
         if (error) {
 
           console.error(
-            "Erro ao verificar admin:",
+            "Erro admin:",
             error
           );
 
-          navigate("/");
-
-          return;
+          return false;
 
         }
 
-        // 🚫 Se não for admin
-        if (!data) {
-
-          navigate("/");
-
-          return;
-
-        }
-
-        // ✅ É admin
-        setIsAdmin(true);
+        return !!data;
 
       }
       catch (err) {
@@ -107,20 +98,43 @@ export default function Admin() {
           err
         );
 
-        navigate("/");
+        return false;
 
       }
 
-    };
+    },
 
-    checkAdmin();
+    enabled: !!user,
 
-  }, [user, loading, navigate]);
+    staleTime:
+      1000 * 60 * 5,
 
+  });
 
+  // 🔐 Redirecionamento seguro
 
-  // 🔄 Tela de carregamento
-  if (loading || isAdmin === null) {
+  if (!loading &&
+      !adminLoading) {
+
+    if (!user ||
+        !isAdmin) {
+
+      toast.error(
+        "Acesso negado"
+      );
+
+      navigate("/");
+
+      return null;
+
+    }
+
+  }
+
+  // 🔄 Loading
+
+  if (loading ||
+      adminLoading) {
 
     return (
 
@@ -133,8 +147,6 @@ export default function Admin() {
     );
 
   }
-
-
 
   return (
 
@@ -149,7 +161,9 @@ export default function Admin() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate("/")}
+            onClick={() =>
+              navigate("/")
+            }
           >
 
             <ArrowLeft className="w-5 h-5" />
@@ -166,8 +180,6 @@ export default function Admin() {
 
       </header>
 
-
-
       {/* CONTEÚDO */}
 
       <main className="max-w-5xl mx-auto px-4 py-4">
@@ -176,7 +188,7 @@ export default function Admin() {
 
           <TabsList className="w-full grid grid-cols-3 sm:grid-cols-9 mb-4">
 
-            <TabsTrigger value="customers" className="gap-1.5">
+            <TabsTrigger value="customers">
 
               <Users className="w-4 h-4" />
 
@@ -184,7 +196,7 @@ export default function Admin() {
 
             </TabsTrigger>
 
-            <TabsTrigger value="orders" className="gap-1.5">
+            <TabsTrigger value="orders">
 
               <ShoppingBag className="w-4 h-4" />
 
@@ -192,7 +204,7 @@ export default function Admin() {
 
             </TabsTrigger>
 
-            <TabsTrigger value="products" className="gap-1.5">
+            <TabsTrigger value="products">
 
               <Package className="w-4 h-4" />
 
@@ -200,7 +212,7 @@ export default function Admin() {
 
             </TabsTrigger>
 
-            <TabsTrigger value="stock" className="gap-1.5">
+            <TabsTrigger value="stock">
 
               <Warehouse className="w-4 h-4" />
 
@@ -208,7 +220,7 @@ export default function Admin() {
 
             </TabsTrigger>
 
-            <TabsTrigger value="banners" className="gap-1.5">
+            <TabsTrigger value="banners">
 
               <Image className="w-4 h-4" />
 
@@ -216,7 +228,7 @@ export default function Admin() {
 
             </TabsTrigger>
 
-            <TabsTrigger value="coupons" className="gap-1.5">
+            <TabsTrigger value="coupons">
 
               <Tag className="w-4 h-4" />
 
@@ -224,7 +236,7 @@ export default function Admin() {
 
             </TabsTrigger>
 
-            <TabsTrigger value="finance" className="gap-1.5">
+            <TabsTrigger value="finance">
 
               <BarChart3 className="w-4 h-4" />
 
@@ -232,7 +244,7 @@ export default function Admin() {
 
             </TabsTrigger>
 
-            <TabsTrigger value="health" className="gap-1.5">
+            <TabsTrigger value="health">
 
               <HeartPulse className="w-4 h-4" />
 
@@ -240,7 +252,7 @@ export default function Admin() {
 
             </TabsTrigger>
 
-            <TabsTrigger value="settings" className="gap-1.5">
+            <TabsTrigger value="settings">
 
               <Settings className="w-4 h-4" />
 
@@ -249,8 +261,6 @@ export default function Admin() {
             </TabsTrigger>
 
           </TabsList>
-
-
 
           <TabsContent value="customers">
 
