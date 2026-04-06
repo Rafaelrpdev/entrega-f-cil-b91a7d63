@@ -139,6 +139,99 @@ export type Database = {
         }
         Relationships: []
       }
+      debts: {
+        Row: {
+          created_at: string
+          creditor: string
+          due_date: string | null
+          id: string
+          paid_amount: number
+          total_amount: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          creditor?: string
+          due_date?: string | null
+          id?: string
+          paid_amount?: number
+          total_amount?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          creditor?: string
+          due_date?: string | null
+          id?: string
+          paid_amount?: number
+          total_amount?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      expenses: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          date: string
+          description: string
+          id: string
+        }
+        Insert: {
+          amount?: number
+          category?: string
+          created_at?: string
+          date?: string
+          description?: string
+          id?: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          date?: string
+          description?: string
+          id?: string
+        }
+        Relationships: []
+      }
+      financial_goals: {
+        Row: {
+          created_at: string
+          current_value: number
+          end_date: string
+          goal_type: string
+          id: string
+          name: string
+          start_date: string
+          target_value: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          current_value?: number
+          end_date?: string
+          goal_type?: string
+          id?: string
+          name?: string
+          start_date?: string
+          target_value?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          current_value?: number
+          end_date?: string
+          goal_type?: string
+          id?: string
+          name?: string
+          start_date?: string
+          target_value?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       order_items: {
         Row: {
           id: string
