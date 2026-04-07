@@ -22,7 +22,7 @@ if (!rootElement) {
 createRoot(rootElement).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider defaultTheme="light" storageKey="gas-theme">
+      <ThemeProvider attribute="class" defaultTheme="light" storageKey="gas-theme">
         <AuthProvider>
           <CartProvider>
             <App />
